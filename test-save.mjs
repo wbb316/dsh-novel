@@ -77,10 +77,24 @@ async function call(method, routePath, { url, body } = {}) {
 
 /** 测试过程中在根目录里建的东西，一起清掉 */
 const extra = []
+/**
+ * 进回收站的东西也要清 —— 这个文件跑在**真实小说库**里，
+ * "删除"那几步会把 __自测* 挪进 <root>\.dsh-novel-trash\，
+ * 只删原路径的话，垃圾会一直堆在用户的回收站里（踩过）。
+ */
+function cleanMyTrash() {
+  const trash = path.join(ROOT, '.dsh-novel-trash')
+  if (!fs.existsSync(trash)) return
+  for (const ent of fs.readdirSync(trash)) {
+    if (ent.startsWith('__自测')) fs.rmSync(path.join(trash, ent), { recursive: true, force: true })
+  }
+  if (fs.readdirSync(trash).length === 0) fs.rmSync(trash, { recursive: true, force: true })
+}
 function cleanup() {
   for (const d of [tempDir, legacyDir, ...extra.map((n) => path.join(ROOT, n))]) {
     if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true })
   }
+  cleanMyTrash()
 }
 cleanup()
 
@@ -570,6 +584,12 @@ try {
     '根目录里只剩你真正的小说',
     fs.readdirSync(ROOT).every((n) => !n.startsWith('__自测')),
     fs.readdirSync(ROOT).join(',')
+  )
+  ok(
+    '回收站里没有留下测试垃圾',
+    !fs.existsSync(path.join(ROOT, '.dsh-novel-trash')) ||
+      fs.readdirSync(path.join(ROOT, '.dsh-novel-trash')).every((n) => !n.startsWith('__自测')),
+    fs.existsSync(path.join(ROOT, '.dsh-novel-trash')) ? fs.readdirSync(path.join(ROOT, '.dsh-novel-trash')).join(',') : '(没有回收站)'
   )
 }
 
