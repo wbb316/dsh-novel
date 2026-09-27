@@ -1,0 +1,58 @@
+{
+  "name": "dsh-novel",
+  "version": "0.9.0",
+  "description": "小说创作台：DSH 插件。管理你的小说项目（纯文本 大纲/世界观/人物卡 + 结构化角色关系 + 章节），提供 5 个 novel_* 工具给 agent，以及一个右侧栏面板（小说库换书并记住读到哪 / 一键续写并流式直播 / 角色关系图 / 章节改名删除拖拽排序）",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wbb316/dsh-novel.git"
+  },
+  "homepage": "https://github.com/wbb316/dsh-novel#readme",
+  "bugs": {
+    "url": "https://github.com/wbb316/dsh-novel/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "dsh-better-sidebar",
+    "deepseek-harness",
+    "deepseek",
+    "novel",
+    "writing",
+    "fiction",
+    "小说",
+    "写作",
+    "轻小说"
+  ],
+  "author": "wbb316",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "dsh-better-sidebar"
+      ]
+    }
+  }
+}

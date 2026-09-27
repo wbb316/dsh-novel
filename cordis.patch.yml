@@ -1,0 +1,4 @@
+# 把本插件插入 DSH profile 的配置树（bundle 的挂载声明）
+- insert:
+    - id: dsh-novel
+      name: dsh-novel
