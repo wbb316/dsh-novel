@@ -343,6 +343,14 @@ node probe-client-bundle.mjs dsh-novel D:\dsh-novel-plugin\lib\client.js
     所以规矩是两头堵：读进来的文本一律过 `lib/text.js` 的 `stripBom()`；
     仓库里用 `test-bom.mjs` 盯着（它连 DSH 启动那一步都照原样复刻了）。
 
+    ⚠️ **这台机器上的 shell 就是 Windows PowerShell 5.1**（`$PSVersionTable.PSVersion` =
+    `5.1.26100`）—— 也就是说 "`Set-Content` 会加 BOM" 不是历史知识，是这里随时会发生的事。
+    要写文件就用写文件工具或 `node`，别用 `Set-Content` / `Out-File` / `>`。
+
+    DSH 那一侧的加固也做了（不只是在插件里躲）：`D:\tools\dsh-app-boot-bom-patch\`
+    给 `dsh-app-boot` 打了个补丁，让它读 profile / bundle 的 `package.json` 时自己剥 BOM ——
+    **别人**用记事本写出来的插件也不会再把整个 web 打挂。升级 dsh 后重跑一次 `apply.mjs`。
+
 ---
 
 ## 🚧 还没做
