@@ -5,6 +5,7 @@
 [![DSH](https://img.shields.io/badge/DSH-0.1.5%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
 [![sidebar](https://img.shields.io/badge/needs-dsh--better--sidebar-7e57c2.svg)](https://github.com/omdsh-dev/DSH-better-sidebar)
 [![tests](https://img.shields.io/badge/tests-796%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
+[![release](https://img.shields.io/github/v/release/wbb316/dsh-novel?label=release&color=success)](https://github.com/wbb316/dsh-novel/releases)
 
 DSH 插件：**小说创作台**。管你的小说项目（大纲 / 世界观 / 角色 & 关系 / 章节），
 一半给 agent 用（`novel_*` 工具），一半给人用（右侧栏「小说」面板）。
@@ -25,6 +26,9 @@ dsh plugin --profile web add github:wbb316/dsh-novel
 # 装完重启一次
 dsh web
 ```
+
+**更新**：再跑一遍同样的命令即可（不带版本号就是默认分支上最新的）。
+每个版本改了什么、有没有坑要躲，都在 [**Releases**](https://github.com/wbb316/dsh-novel/releases) 里。
 
 **前置条件**
 
