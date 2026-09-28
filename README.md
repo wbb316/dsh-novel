@@ -4,7 +4,7 @@
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![DSH](https://img.shields.io/badge/DSH-0.1.5%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
 [![sidebar](https://img.shields.io/badge/needs-dsh--better--sidebar-7e57c2.svg)](https://github.com/omdsh-dev/DSH-better-sidebar)
-[![tests](https://img.shields.io/badge/tests-796%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
+[![tests](https://img.shields.io/badge/tests-1083%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
 [![release](https://img.shields.io/github/v/release/wbb316/dsh-novel?label=release&color=success)](https://github.com/wbb316/dsh-novel/releases)
 
 DSH 插件：**小说创作台**。管你的小说项目（大纲 / 世界观 / 角色 & 关系 / 章节），
@@ -59,18 +59,22 @@ dsh plugin --profile web add link:D:/dsh-novel-plugin
 **📚 小说库**：记住「你正在写哪本」+「每本读到哪一章」；书名那行点开就是列表（搜索 / 排序 / 进度 / 上次看到）；
 可以就地改名、删除（**删除 = 移到回收站**，不是真删）。
 
-**👥 角色 & 关系**：角色卡增删改（带头像 emoji，会画在关系图的圆点上），关系用
-「从谁 → 什么关系 → 到谁」，**关系图节点可以拖**，位置记在本地。
+**👥 角色 & 关系**：角色卡增删改（头像可以是 **emoji / 姓氏**，也可以**上传图片** —— 图片存进 `头像\` 目录，`角色.json` 里只记路径），
+关系用「从谁 → 什么关系 → 到谁」；**关系图自动按亲疏摆位**（力导向：关系多的居中、关系近的挨着，不再是干巴巴一个圈），
+节点还能手动拖，位置记在本地。
 
 **✍️ 章节自己也能写**：点「＋ 新章节」建个空章节，直接在面板里写正文（Ctrl+S 保存，
 `.txt` 按纯文本存）；改名、删除、**按住拖动排序**（松手自动重新编号）都在同一行。
+**分卷**：点「＋ 新建卷」分卷，章节按卷分组显示，**把章节拖到别的卷标题上就挪进那一卷**，卷能改名 / 删（删 = 整卷进回收站）。
 
 **📂 保存位置可配置**：小说存哪个目录由你定，**目录不存在会自动创建**。
 
 **⇪ 老格式一键迁移**：老项目（`outline.md` 那套）在设定页会提示，点一下转成新格式，
 **原件搬进 `_旧格式备份\`**，不删。
 
-**⬇ 导出设定集**：把大纲 + 世界观 + 人物卡 + 章节清单合成一个 `设定集.txt` 放进小说目录。
+**⬇ 导出**：点「⬇ 导出」选格式 —— `设定集.txt`（大纲 + 世界观 + 人物卡 + 章节清单）、
+**EPUB**（能直接丢进阅读器，卷 = 分组）、**Word**（卷 = 标题 1，章 = 标题 2）。
+EPUB/DOCX 是**自己写的 ZIP 打包器**（只用 Node 内置 `zlib`，零依赖）。
 
 ---
 
@@ -177,15 +181,18 @@ C:\Users\<你>\.dsh\profiles\<profile>\package.json
 
 | 路由 | 说明 |
 |---|---|
-| `GET  /novel/api/list` | 小说 + 章节 + 设定文件 + 角色数 |
-| `GET  /novel/api/read?novel=&file=` | 读一章正文 / 一个设定文件 |
-| `GET  /novel/api/cast?novel=` | 读角色表（带 warnings / legacyMd 标记） |
+| `GET  /novel/api/list` | 小说 + 章节 + 卷 + 设定文件 + 角色数 |
+| `GET  /novel/api/read?novel=&file=` | 读一章正文 / 一个设定文件（卷里的章用 `卷名/文件名`） |
+| `GET  /novel/api/cast?novel=` | 读角色表（带 warnings / legacyMd / 图片头像地址） |
 | `POST /novel/api/cast` | `{novel, cast}` 整表保存，或 `{novel, ops}` 增量改 |
-| `POST /novel/api/save` | 存 `outline.md` / `world.md` / `chapters\*.md` |
+| `GET  /novel/api/avatar?novel=&id=` | **图片头像**出图（没图 404，带正确 Content-Type） |
+| `POST /novel/api/avatar` | 上传头像 `{novel, id, dataUrl}` / 去掉 `{action:'remove'}` |
+| `POST /novel/api/save` | 存 `大纲.txt` / `世界观.txt` / `chapters\*.txt` |
 | `GET  /novel/api/stream?session=` | **流式输出**：正在写的字 + 预览类型（chapter/text/reasoning） |
-| `POST /novel/api/chapter` | 章节 `create`（空章节）/ `rename` / `delete` / `reorder`（重新编号） |
+| `POST /novel/api/chapter` | 章节 `create`（空章节，可带 `volume`）/ `rename` / `delete` / `reorder`（重新编号 + 挪卷） |
+| `POST /novel/api/volume` | 卷 `create` / `rename` / `delete`（删卷 = 整卷进回收站） |
 | `POST /novel/api/migrate` | 老格式一键迁移（原件搬进 `_旧格式备份\`） |
-| `POST /novel/api/export` | 导出 `设定集.txt`（大纲 + 世界观 + 人物卡 + 章节清单） |
+| `POST /novel/api/export` | 导出 `设定集.txt` / **EPUB** / **Word**（`{format}`） |
 | `POST /novel/api/novel` | 小说 `create` / `rename` / `delete`（删除 = 移到回收站） |
 
 ⚠️ 路由是**按路径**注册的：`/novel/api/cast` 的 GET 和 POST 是**同一条路由**，
@@ -257,13 +264,14 @@ node test-save.mjs        # 写盘全链路（临时小说里真建真删：新�
 node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 桩打到真路由
 ```
 
-目前 **796 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
+目前 **1083 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
 
 | 测试 | 在哪跑 | 会留下什么 |
 |---|---|---|
 | `test-save.mjs` | **你的真实小说库里**（只建 `__自测*` 临时作品） | 什么也不留 —— 跑完连它挪进回收站的那几份一起清，并有断言守着 |
 | `test-api.mjs` | 同上，但只做 GET 和注定 400 的写请求 | 无 |
 | `test-bom.mjs` | 仓库自己 + 临时小说根目录 | 无（整目录删掉）；它会**照原样复刻 dsh web 启动那一步**，BOM 一出现就红 |
+| `test-volume.mjs` / `test-avatar.mjs` / `test-ebook.mjs` | 系统临时目录 | 无（整目录删掉）—— 卷、图片头像、EPUB/DOCX 都在这三个里 |
 | `test-client.mjs` / `test-config.mjs` | 系统临时目录 / 临时配置文件 | 无（整目录删掉） |
 
 > 早期版本这里踩过一次：`test-save` 把临时作品"删除"进真实回收站，清理却只删了原路径，
@@ -359,8 +367,7 @@ node probe-client-bundle.mjs dsh-novel D:\dsh-novel-plugin\lib\client.js
 
 ## 🚧 还没做
 
-- 章节的**多级**结构（卷 / 章）—— 现在只有平铺的章节
-- 关系图手动拖过之后的**自动布局**（按关系亲疏摆位，而不是圆圈）
-- 角色头像用**图片**（现在只能是 emoji / 字符，因为要保证项目里只有纯文本 + json）
-- 导出成 **epub / docx**（现在只导出 `设定集.txt`）
 - 多设备同步（小说库记忆现在存在浏览器本地，手机上打开是另一套）
+
+> v0.11.0 把前面四项做完了：卷 / 章、关系图自动布局（力导向）、图片头像、EPUB / Word 导出。
+> 见 [Releases](https://github.com/wbb316/dsh-novel/releases)。
