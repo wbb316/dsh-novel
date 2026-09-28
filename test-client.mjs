@@ -1545,6 +1545,91 @@ try {
       delete globalThis.document;
       delete globalThis.FileReader;
     }
+
+    // ── 卷：新建 / 往卷里加章 / 跨卷拖 / 改名 / 删卷 ──
+    {
+      click(findAll(t, (n) => n.type === 'button' && textOf(n).indexOf('章节') === 0)[0]);
+      t = await settle(p.rt, p.Panel, props21);
+      const volRows = () => byClass(t, 'dn_vol');
+      ok('章节页有「＋ 新建卷」', !!btn(t, '新建卷'));
+      ok('没有卷时只有「未分卷」一组', volRows().length === 1 && treeText(volRows()[0]).indexOf('未分卷') >= 0, String(volRows().length));
+
+      click(btn(t, '新建卷'));
+      t = await settle(p.rt, p.Panel, props21);
+      ok('出现建卷的输入行', byClass(t, 'dn_chrename').length === 1);
+      setValue(findAll(byClass(t, 'dn_chrename')[0], (n) => n.type === 'input')[0], '第一卷 恋爱练习');
+      t = await settle(p.rt, p.Panel, props21);
+      const volInput = findAll(byClass(t, 'dn_chrename')[0], (n) => n.type === 'input')[0];
+      ok('输入框里真的有字', String(volInput.props.value) === '第一卷 恋爱练习', String(volInput.props.value));
+      // ⚠️ 这里要用「创建卷」：`btn()` 是按下标/包含匹配的，「建卷」会先撞上工具栏的「＋ 新建卷」
+      click(btn(t, '创建卷'));
+      t = await settle(p.rt, p.Panel, props21);
+      ok('建卷有提示', treeText(t).indexOf('建好') >= 0, treeText(t).slice(-90));
+      ok('磁盘上多了卷目录', fs.existsSync(path.join(ROOT, NEW2, 'chapters', '第一卷 恋爱练习')));
+      ok('列表里出现两行卷标题', volRows().length === 2, String(volRows().length));
+      ok('空卷也显示（0 章）', treeText(volRows().find((n) => treeText(n).indexOf('第一卷') >= 0)).indexOf('0 章') >= 0);
+
+      // 卷标题上的 ＋：往这一卷里加一章
+      const volHead = () => byClass(t, 'dn_vol').find((n) => treeText(n).indexOf('第一卷 恋爱练习') >= 0);
+      click(findAll(volHead(), (n) => n.type === 'button' && textOf(n) === '＋')[0]);
+      t = await settle(p.rt, p.Panel, props21);
+      ok('提示了要放进哪一卷', treeText(t).indexOf('放进「第一卷 恋爱练习」') >= 0);
+      setValue(findAll(byClass(t, 'dn_chrename')[0], (n) => n.type === 'input')[0], '卷里的第一章');
+      t = await settle(p.rt, p.Panel, props21);
+      click(btn(t, '创建'));
+      t = await settle(p.rt, p.Panel, props21);
+      ok('建完提示里带卷名', treeText(t).indexOf('第一卷 恋爱练习') >= 0);
+      const volDir = path.join(ROOT, NEW2, 'chapters', '第一卷 恋爱练习');
+      ok('文件真的落在卷目录里', fs.readdirSync(volDir).some((f) => f.indexOf('卷里的第一章') >= 0), fs.readdirSync(volDir).join(','));
+      ok('卷标题上变成 1 章', treeText(volHead()).indexOf('1 章') >= 0);
+      ok(
+        '卷里新建的章也直接进了编辑态（骨架不为空）',
+        byType(t, 'textarea').length >= 1 && String(byType(t, 'textarea')[0].props.value).indexOf('第') === 0,
+        byType(t, 'textarea').length ? String(byType(t, 'textarea')[0].props.value).slice(0, 12) : '(没有 textarea)'
+      );
+
+      // 跨卷拖：把平铺的章节拖到「第一卷」标题上 = 挪进这一卷
+      const items = byClass(t, 'dn_item');
+      const flatIdx = items.findIndex((n) => treeText(n).indexOf('开头') >= 0);
+      ok('找得到未分卷那一章', flatIdx >= 0, String(flatIdx));
+      items[flatIdx].props.onPointerDown();
+      t = await settle(p.rt, p.Panel, props21);
+      volHead().props.onPointerEnter();
+      t = await settle(p.rt, p.Panel, props21);
+      ok('卷标题成了落点（有 over 标记）', byClass(t, 'dn_vol').some((n) => hasClass(n, 'over')));
+      volHead().props.onPointerUp();
+      t = await settle(p.rt, p.Panel, props21);
+      ok('拖完提示挪进了哪一卷', treeText(t).indexOf('已挪进「第一卷 恋爱练习」') >= 0, treeText(byClass(t, 'dn_ok2')[0] || {}).slice(0, 26));
+      ok('文件真的从平铺挪进了卷目录', fs.readdirSync(volDir).some((f) => f.indexOf('开头') >= 0), fs.readdirSync(volDir).join(','));
+      ok('平铺目录里没有那一章了', !fs.readdirSync(path.join(ROOT, NEW2, 'chapters')).some((f) => f.indexOf('开头') >= 0));
+
+      // 卷改名 / 删卷：面板用的是系统 prompt / confirm，测试里桩掉
+      globalThis.prompt = () => '第二卷 中段';
+      click(findAll(volHead(), (n) => n.type === 'button' && textOf(n) === '🖊')[0]);
+      t = await settle(p.rt, p.Panel, props21);
+      ok('卷目录改名了', fs.existsSync(path.join(ROOT, NEW2, 'chapters', '第二卷 中段')));
+      ok('旧卷目录没了', !fs.existsSync(volDir));
+      ok('里面的章节跟着走', fs.readdirSync(path.join(ROOT, NEW2, 'chapters', '第二卷 中段')).length === 2, String(fs.readdirSync(path.join(ROOT, NEW2, 'chapters', '第二卷 中段')).length));
+      ok('列表里是新卷名', treeText(t).indexOf('第二卷 中段') >= 0);
+
+      globalThis.confirm = () => true;
+      const renHead = () => byClass(t, 'dn_vol').find((n) => treeText(n).indexOf('第二卷 中段') >= 0);
+      click(findAll(renHead(), (n) => n.type === 'button' && textOf(n) === '🗑️')[0]);
+      t = await settle(p.rt, p.Panel, props21);
+      ok('删卷有提示（说了是可恢复的）', treeText(t).indexOf('整卷进了回收站') >= 0, treeText(byClass(t, 'dn_ok2')[0] || {}).slice(0, 24));
+      ok('卷目录没了', !fs.existsSync(path.join(ROOT, NEW2, 'chapters', '第二卷 中段')));
+      const trash = path.join(ROOT, '.dsh-novel-trash');
+      ok(
+        '回收站里能找回整卷（章节都在里面）',
+        fs.existsSync(trash) &&
+          fs.readdirSync(trash).some(
+            (d) => d.indexOf('第二卷 中段') >= 0 && fs.readdirSync(path.join(trash, d)).some((f) => /\.txt$/.test(f))
+          )
+      );
+      ok('卷没了，列表回到只有未分卷', byClass(t, 'dn_vol').length === 1, String(byClass(t, 'dn_vol').length));
+      delete globalThis.prompt;
+      delete globalThis.confirm;
+    }
   }
 } finally {
   try {
