@@ -1390,13 +1390,37 @@ try {
     ok('章节也转了', fs.existsSync(path.join(ROOT, OLD2, 'chapters', '第001章-甲.txt')))
     ok('转完按钮就消失了', !btn(t, '转成新格式'))
 
-    // ── 导出设定集 ──
-    ok('设定页有「导出设定集」', !!btn(t, '导出设定集'))
-    click(btn(t, '导出设定集'))
+    // ── 导出：点「⬇ 导出」先展开三种格式，选了才真的导 ──
+    ok('设定页有「导出」按钮', !!btn(t, '导出'))
+    ok('没点之前不显示格式', !btn(t, 'EPUB'))
+    click(btn(t, '导出'))
+    t = await settle(p.rt, p.Panel, props21)
+    ok('展开后有三种格式', !!btn(t, '设定集.txt') && !!btn(t, 'EPUB') && !!btn(t, 'Word'))
+    click(btn(t, '设定集.txt'))
     t = await settle(p.rt, p.Panel, props21)
     ok('导出后有提示', treeText(t).indexOf('已导出') >= 0, treeText(byClass(t, 'dn_ok2')[0] || {}).slice(0, 22))
     ok('设定集.txt 真生成了', fs.existsSync(path.join(ROOT, OLD2, '设定集.txt')))
     ok('设定集里有章节清单', fs.readFileSync(path.join(ROOT, OLD2, '设定集.txt'), 'utf8').indexOf('四、章节清单') >= 0)
+
+    // ── 导出 EPUB / Word：要真的落盘，而且是 ZIP 签名 ──
+    click(btn(t, '导出'))
+    t = await settle(p.rt, p.Panel, props21)
+    click(btn(t, 'EPUB'))
+    t = await settle(p.rt, p.Panel, props21)
+    const epubFile = path.join(ROOT, OLD2, OLD2 + '.epub')
+    ok('EPUB 落盘了', fs.existsSync(epubFile), epubFile)
+    ok(
+      'EPUB 是 ZIP（PK 开头），而且能直接搜到 mimetype 原文（store 没压缩）',
+      fs.existsSync(epubFile) &&
+        fs.readFileSync(epubFile).subarray(0, 2).toString('utf8') === 'PK' &&
+        fs.readFileSync(epubFile).includes('application/epub+zip')
+    )
+    click(btn(t, '导出'))
+    t = await settle(p.rt, p.Panel, props21)
+    click(btn(t, 'Word'))
+    t = await settle(p.rt, p.Panel, props21)
+    const docxFile = path.join(ROOT, OLD2, OLD2 + '.docx')
+    ok('Word 落盘了且是 ZIP', fs.existsSync(docxFile) && fs.readFileSync(docxFile).subarray(0, 2).toString('utf8') === 'PK', docxFile)
 
     // ── 角色头像 ──
     t = await pickNovel(p.rt, p.Panel, props21, t, NEW2)
