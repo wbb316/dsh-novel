@@ -1,10 +1,10 @@
-﻿# dsh-novel 🖋️
+# dsh-novel 🖋️
 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![DSH](https://img.shields.io/badge/DSH-0.1.5%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
 [![sidebar](https://img.shields.io/badge/needs-dsh--better--sidebar-7e57c2.svg)](https://github.com/omdsh-dev/DSH-better-sidebar)
-[![tests](https://img.shields.io/badge/tests-755%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
+[![tests](https://img.shields.io/badge/tests-796%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
 
 DSH 插件：**小说创作台**。管你的小说项目（大纲 / 世界观 / 角色 & 关系 / 章节），
 一半给 agent 用（`novel_*` 工具），一半给人用（右侧栏「小说」面板）。
@@ -242,6 +242,7 @@ C:\Users\<你>\.dsh\profiles\<profile>\package.json
 ```powershell
 cd D:\dsh-novel-plugin
 node test-cast.mjs        # 角色/关系纯函数：脏数据、指错人、渲染纯文本人物卡
+node test-bom.mjs         # BOM 守卫：仓库里不许有 BOM + 用户文件带 BOM 也要能读
 node test-stream.mjs      # 流式缓冲：帧折叠、半截 JSON 抠字符串、preview 降级
 node test-config.mjs      # 保存位置：自动建目录、夹取、环境变量优先、坏配置兜底
 node test-library.mjs     # 小说库记忆（纯逻辑）：记住/回落/按库分组/坏数据/不跨设备
@@ -252,12 +253,13 @@ node test-save.mjs        # 写盘全链路（临时小说里真建真删：新�
 node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 桩打到真路由
 ```
 
-目前 **755 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
+目前 **796 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
 
 | 测试 | 在哪跑 | 会留下什么 |
 |---|---|---|
 | `test-save.mjs` | **你的真实小说库里**（只建 `__自测*` 临时作品） | 什么也不留 —— 跑完连它挪进回收站的那几份一起清，并有断言守着 |
 | `test-api.mjs` | 同上，但只做 GET 和注定 400 的写请求 | 无 |
+| `test-bom.mjs` | 仓库自己 + 临时小说根目录 | 无（整目录删掉）；它会**照原样复刻 dsh web 启动那一步**，BOM 一出现就红 |
 | `test-client.mjs` / `test-config.mjs` | 系统临时目录 / 临时配置文件 | 无（整目录删掉） |
 
 > 早期版本这里踩过一次：`test-save` 把临时作品"删除"进真实回收站，清理却只删了原路径，
@@ -327,6 +329,19 @@ node probe-client-bundle.mjs dsh-novel D:\dsh-novel-plugin\lib\client.js
 17. **UI 功能必须有一条"入口真的在界面上"的断言**：📁 保存位置那次，宿主接口 + 组件都写好了，
     就是忘了把按钮挂上去 —— 功能等于不存在，而所有测试都是绿的。现在每个新入口都有一条
     `ok('标题栏有 📁 按钮', …)`。
+18. **文本文件开头千万别有 UTF-8 BOM**（`EF BB BF`）。`JSON.parse` **不认 BOM**，
+    `JSON.parse('\uFEFF{}')` 直接抛 `SyntaxError: Unexpected token '\uFEFF'`。
+    真踩过两次：
+    - **插件自己的 `package.json` 被带 BOM 保存** → dsh web 启动时
+      `loadProfileDirectory` 里那句 `JSON.parse(readFileSync(pkg,'utf8'))` 抛错 →
+      `composeProfile` 阶段就退出 → **3080 根本没监听**。症状只是"网页打不开"，
+      跟插件八竿子打不着，能查半天。
+    - 用户拿**记事本**改了一下 `角色.json` / `~/.dsh-novel/config.json` → 插件读的时候就炸。
+
+    谁写的 BOM：**PowerShell 5.1 的 `Set-Content -Encoding UTF8` / `Out-File`、记事本的
+    「另存为 UTF-8」都会加**（VS Code 默认不加；仓库里放了 `.editorconfig` 写着 `charset = utf-8`）。
+    所以规矩是两头堵：读进来的文本一律过 `lib/text.js` 的 `stripBom()`；
+    仓库里用 `test-bom.mjs` 盯着（它连 DSH 启动那一步都照原样复刻了）。
 
 ---
 

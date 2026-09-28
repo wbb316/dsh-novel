@@ -1,0 +1,16 @@
+# 这个文件唯一的使命：**别让编辑器往文件里塞 BOM**。
+#
+# 起因：package.json 被带 BOM 保存过一次，dsh web 启动时
+# loadProfileDirectory 里 JSON.parse(readFileSync(pkg,'utf8')) 直接抛
+# SyntaxError: Unexpected token '\uFEFF' → composeProfile 阶段退出 → 3080 根本没监听。
+#
+# charset 的可选值：utf-8（不带 BOM）/ utf-8-bom（带 BOM）。
+# VS Code 认这个文件，记事本不认 —— 用记事本改完请自己确认一下（node test-bom.mjs）。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
