@@ -821,7 +821,9 @@ try {
     const svg = byClass(tree, 'dn_graph')[0]
     ok('画出来了（svg）', !!svg && svg.type === 'svg', svg ? svg.type : '(没有)')
     ok('有箭头 marker', findAll(svg, (n) => n.type === 'marker').length === 1)
-    ok('圆点 = 角色数（2）', findAll(svg, (n) => n.type === 'circle').length === 2, String(findAll(svg, (n) => n.type === 'circle').length))
+    // 只数**节点上的**圆点（defs 里那个是裁头像用的 clipPath 圆，不算角色）
+    const nodeCircles = findAll(svg, (n) => n.type === 'circle' && (n.props.fill === undefined ? false : true));
+    ok('圆点 = 角色数（2）', nodeCircles.length === 2, String(nodeCircles.length))
     ok('连线 = 关系数（1）', findAll(svg, (n) => n.type === 'line').length === 1, String(findAll(svg, (n) => n.type === 'line').length))
     ok('线上标了关系名', treeText(svg).indexOf('暗恋（单向）') >= 0)
     ok('名字都标了', treeText(svg).indexOf('苏晚') >= 0 && treeText(svg).indexOf('林知夏') >= 0)
@@ -1468,10 +1470,11 @@ try {
     t = await settle(p.rt, p.Panel, props21)
     click(btn(t, '新角色'))
     t = await settle(p.rt, p.Panel, props21)
-    ok('角色编辑里有头像字段', !!fieldBox(t, '头像（1~2 个字符 / emoji）'))
+    const avatarLabel = '头像（没有图片时用：1~4 个字符 / emoji）';
+    ok('角色编辑里有头像字段', !!fieldBox(t, avatarLabel))
     setValue(fieldBox(t, '名字'), '苏晚')
     t = await settle(p.rt, p.Panel, props21)
-    setValue(fieldBox(t, '头像（1~2 个字符 / emoji）'), '🖋️')
+    setValue(fieldBox(t, avatarLabel), '🖋️')
     t = await settle(p.rt, p.Panel, props21)
     ok('角色列表行显示了头像', treeText(byClass(t, 'dn_rows')[0]).indexOf('🖋️') >= 0, treeText(byClass(t, 'dn_rows')[0]).slice(0, 12))
     // 只有 1 个角色时关系图不画（画不出线），所以再加一个
@@ -1488,6 +1491,60 @@ try {
     const castJson = JSON.parse(fs.readFileSync(path.join(ROOT, NEW2, '角色.json'), 'utf8'))
     ok('头像存进了 角色.json', castJson.characters[0].avatar === '🖋️', JSON.stringify(castJson.characters[0]))
     ok('人物卡.txt 里也带头像', fs.readFileSync(path.join(ROOT, NEW2, '人物卡.txt'), 'utf8').indexOf('【🖋️ 苏晚】') >= 0)
+
+    // ── 图片头像：点「换图片头像」→（桩出来的）选图 → 读成 dataURL 交给宿主存盘 ──
+    {
+      const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7, 7, 7]);
+      const dataUrl = 'data:image/png;base64,' + png.toString('base64');
+      // 面板会自己建 <style> 和 <input type=file>，所以这个桩要能同时装成两种
+      globalThis.document = {
+        head: { appendChild() {} },
+        createElement(tag) {
+          // 面板注入样式时会 createElement('style') + setAttribute + head.appendChild，
+          // 所以这个桩要装得像一点（不然一渲染就炸）
+          if (tag === 'style') return { textContent: '', setAttribute() {} };
+          return {
+            type: '',
+            accept: '',
+            onchange: null,
+            files: [{ name: 'a.png' }],
+            click() {
+              if (this.onchange) this.onchange();
+            }
+          };
+        }
+      };
+      globalThis.FileReader = class {
+        readAsDataURL() {
+          this.result = dataUrl;
+          if (this.onload) this.onload();
+        }
+      };
+
+      ok('编辑区有「换图片头像」按钮', !!btn(t, '换图片头像'));
+      click(btn(t, '换图片头像'));
+      t = await settle(p.rt, p.Panel, props21);
+      const avDir = path.join(ROOT, NEW2, '头像');
+      ok('图片真的落盘到 头像\\ 目录', fs.existsSync(avDir) && fs.readdirSync(avDir).length === 1, fs.existsSync(avDir) ? fs.readdirSync(avDir).join(',') : '目录不存在');
+      ok('存的是原字节', fs.existsSync(avDir) && fs.readFileSync(path.join(avDir, fs.readdirSync(avDir)[0])).equals(png));
+      const saved = JSON.parse(fs.readFileSync(path.join(ROOT, NEW2, '角色.json'), 'utf8'));
+      const withPic = saved.characters.find((c) => c.avatarFile);
+      ok('角色.json 里记的是路径（不是 base64）', !!withPic && /^头像\//.test(withPic.avatarFile), JSON.stringify(saved.characters.map((c) => [c.id, c.avatarFile])));
+      ok('记的是**图片那个角色**的路径，文件名对得上', !!withPic && fs.existsSync(path.join(ROOT, NEW2, withPic.avatarFile)), withPic && withPic.avatarFile);
+      t = await settle(p.rt, p.Panel, props21);
+      ok('编辑区显示成 <img> 了', !!byClass(t, 'dn_avimg')[0]);
+      ok('说了"用的是图片"', treeText(t).indexOf('用的是图片') >= 0);
+      ok('出现了「去掉图片」', !!btn(t, '去掉图片'));
+
+      click(btn(t, '去掉图片'));
+      t = await settle(p.rt, p.Panel, props21);
+      ok('去掉后图片文件删了', !fs.existsSync(avDir) || fs.readdirSync(avDir).length === 0);
+      ok('回到 emoji 显示', !byClass(t, 'dn_avimg')[0] && treeText(t).indexOf('用的是字符') >= 0);
+      const back = JSON.parse(fs.readFileSync(path.join(ROOT, NEW2, '角色.json'), 'utf8'));
+      ok('emoji 兜底还在（没被图片顶掉）', back.characters[0].avatar === '🖋️', back.characters[0].avatar);
+      delete globalThis.document;
+      delete globalThis.FileReader;
+    }
   }
 } finally {
   try {
