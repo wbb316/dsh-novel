@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 本地验证「角色/关系」纯函数层（lib/cast.js）—— 不碰磁盘、不启 DSH。
  *
  * 跑法：  cd D:\dsh-novel-plugin ; node test-cast.mjs
@@ -59,6 +59,19 @@ console.log('── 1. normalizeCast：脏数据也不能炸 ──')
   ok('没名字的跳过有警告', warnings.some((w) => w.includes('没有名字')))
   ok('非对象跳过有警告', warnings.some((w) => w.includes('不是对象')))
   ok('summary 对', castSummary(cast) === '3 个角色 · 1 条关系', castSummary(cast))
+
+  // 头像（v0.9）：1~4 个字符，去空白，超长截断
+  const av = normalizeCast({
+    characters: [
+      { name: '苏晚', avatar: '🖋️' },
+      { name: '林知夏', avatar: '  夏  ' },
+      { name: '周晓', avatar: '这个头像太长了会被截掉' }
+    ]
+  }).cast
+  ok('头像存下来了', av.characters[0].avatar === '🖋️', av.characters[0].avatar)
+  ok('头像去空白', av.characters[1].avatar === '夏', JSON.stringify(av.characters[1].avatar))
+  ok('头像超长截断到 4 个字符', av.characters[2].avatar.length === 4, av.characters[2].avatar)
+  ok('没给头像就是空串', normalizeCast({ characters: [{ name: 'x' }] }).cast.characters[0].avatar === '')
 }
 
 console.log('\n── 2. resolveRef：id 和名字都认 ──')

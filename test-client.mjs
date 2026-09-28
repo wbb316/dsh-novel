@@ -1321,6 +1321,110 @@ try {
 
     delete globalThis.localStorage
   }
+
+  console.log('\n── 21. 新章节 / 改正文 / 一键迁移 / 导出设定集 / 头像 ──')
+  {
+    // 造两部干净的书：一部新格式（用来写），一部老格式（用来迁移）
+    const NEW2 = '__自测新格式2__'
+    const OLD2 = '__自测老格式2__'
+    fs.mkdirSync(path.join(ROOT, NEW2, 'chapters'), { recursive: true })
+    for (const f of ['大纲.txt', '世界观.txt', '人物卡.txt']) {
+      fs.writeFileSync(path.join(ROOT, NEW2, f), '占位\n', 'utf8')
+    }
+    fs.writeFileSync(
+      path.join(ROOT, NEW2, '角色.json'),
+      JSON.stringify({ version: 1, characters: [], relations: [] }),
+      'utf8'
+    )
+    fs.writeFileSync(path.join(ROOT, NEW2, 'chapters', '第001章-开头.txt'), '第1章 开头\n\n原来的正文\n', 'utf8')
+
+    fs.mkdirSync(path.join(ROOT, OLD2, 'chapters'), { recursive: true })
+    fs.writeFileSync(path.join(ROOT, OLD2, 'outline.md'), '# 老大纲\n\n**粗体**\n', 'utf8')
+    fs.writeFileSync(path.join(ROOT, OLD2, 'world.md'), '# 老世界观\n', 'utf8')
+    fs.writeFileSync(path.join(ROOT, OLD2, 'chapters', '第001章-甲.md'), '# 第1章 甲\n\n**正文甲**\n', 'utf8')
+
+    const p = await freshPanel()
+    let t = p.tree
+    const props21 = { visible: true }
+
+    // ── 新建空章节 ──
+    t = await pickNovel(p.rt, p.Panel, props21, t, NEW2)
+    click(findAll(t, (n) => n.type === 'button' && textOf(n).indexOf('章节') === 0)[0])
+    t = await settle(p.rt, p.Panel, props21)
+    ok('章节页有「＋ 新章节」', !!btn(t, '新章节'))
+    click(btn(t, '新章节'))
+    t = await settle(p.rt, p.Panel, props21)
+    ok('出现新建章节的输入行', byClass(t, 'dn_chrename').length === 1)
+    const 新章名 = findAll(byClass(t, 'dn_chrename')[0], (n) => n.type === 'input')[0]
+    setValue(新章名, '契约')
+    t = await settle(p.rt, p.Panel, props21)
+    click(btn(t, '创建'))
+    t = await settle(p.rt, p.Panel, props21)
+    ok('磁盘上建出来了', fs.existsSync(path.join(ROOT, NEW2, 'chapters', '第002章-契约.txt')))
+    ok('建完提示了', treeText(t).indexOf('已新建') >= 0, treeText(byClass(t, 'dn_ok2')[0] || {}).slice(0, 20))
+    ok('建完直接进编辑态', byType(t, 'textarea').length >= 1)
+
+    // ── 直接改正文 ──
+    const ta = byType(t, 'textarea')[0]
+    ok('编辑框里是空章节骨架', String(ta.props.value).indexOf('第2章 契约') >= 0, String(ta.props.value).slice(0, 14))
+    setValue(ta, '第2章 契约\n\n「绝对不许当真。」她写下这行字的时候，我在旁边看着。\n')
+    t = await settle(p.rt, p.Panel, props21)
+    click(btn(t, '保存正文'))
+    t = await settle(p.rt, p.Panel, props21)
+    const saved = fs.readFileSync(path.join(ROOT, NEW2, 'chapters', '第002章-契约.txt'), 'utf8')
+    ok('正文真写进磁盘了', saved.indexOf('绝对不许当真') >= 0, JSON.stringify(saved.slice(0, 16)))
+    ok('保存后回到只读预览', byType(t, 'pre').length >= 1)
+    ok('保存提示说了已保存', treeText(t).indexOf('已保存') >= 0, treeText(byClass(t, 'dn_ok2')[0] || {}).slice(0, 22))
+
+    // ── 一键迁移（老格式的书） ──
+    t = await pickNovel(p.rt, p.Panel, props21, t, OLD2)
+    click(findAll(t, (n) => n.type === 'button' && textOf(n).indexOf('设定') === 0)[0])
+    t = await settle(p.rt, p.Panel, props21)
+    ok('老格式的书显示「转成新格式」', !!btn(t, '转成新格式'))
+    ok('也提示了这是老格式', treeText(t).indexOf('还是老格式') >= 0)
+    click(btn(t, '转成新格式'))
+    t = await settle(p.rt, p.Panel, props21)
+    ok('迁移后有成功提示', treeText(t).indexOf('已转换') >= 0, treeText(byClass(t, 'dn_ok2')[0] || {}).slice(0, 22))
+    ok('大纲.txt 出现了', fs.existsSync(path.join(ROOT, OLD2, '大纲.txt')))
+    ok('原件进了备份目录', fs.existsSync(path.join(ROOT, OLD2, '_旧格式备份', 'outline.md')))
+    ok('章节也转了', fs.existsSync(path.join(ROOT, OLD2, 'chapters', '第001章-甲.txt')))
+    ok('转完按钮就消失了', !btn(t, '转成新格式'))
+
+    // ── 导出设定集 ──
+    ok('设定页有「导出设定集」', !!btn(t, '导出设定集'))
+    click(btn(t, '导出设定集'))
+    t = await settle(p.rt, p.Panel, props21)
+    ok('导出后有提示', treeText(t).indexOf('已导出') >= 0, treeText(byClass(t, 'dn_ok2')[0] || {}).slice(0, 22))
+    ok('设定集.txt 真生成了', fs.existsSync(path.join(ROOT, OLD2, '设定集.txt')))
+    ok('设定集里有章节清单', fs.readFileSync(path.join(ROOT, OLD2, '设定集.txt'), 'utf8').indexOf('四、章节清单') >= 0)
+
+    // ── 角色头像 ──
+    t = await pickNovel(p.rt, p.Panel, props21, t, NEW2)
+    click(findAll(t, (n) => n.type === 'button' && textOf(n).indexOf('角色') === 0)[0])
+    t = await settle(p.rt, p.Panel, props21)
+    click(btn(t, '新角色'))
+    t = await settle(p.rt, p.Panel, props21)
+    ok('角色编辑里有头像字段', !!fieldBox(t, '头像（1~2 个字符 / emoji）'))
+    setValue(fieldBox(t, '名字'), '苏晚')
+    t = await settle(p.rt, p.Panel, props21)
+    setValue(fieldBox(t, '头像（1~2 个字符 / emoji）'), '🖋️')
+    t = await settle(p.rt, p.Panel, props21)
+    ok('角色列表行显示了头像', treeText(byClass(t, 'dn_rows')[0]).indexOf('🖋️') >= 0, treeText(byClass(t, 'dn_rows')[0]).slice(0, 12))
+    // 只有 1 个角色时关系图不画（画不出线），所以再加一个
+    click(btn(t, '新角色'))
+    t = await settle(p.rt, p.Panel, props21)
+    setValue(fieldBox(t, '名字'), '林知夏')
+    t = await settle(p.rt, p.Panel, props21)
+    {
+      const texts = findAll(byClass(t, 'dn_graph')[0], (n) => n.type === 'text')
+      ok('关系图圆点里画的是头像', texts.some((n) => textOf(n) === '🖋️'), texts.map(textOf).slice(0, 5).join('|'))
+    }
+    click(btn(t, '保存角色表'))
+    t = await settle(p.rt, p.Panel, props21)
+    const castJson = JSON.parse(fs.readFileSync(path.join(ROOT, NEW2, '角色.json'), 'utf8'))
+    ok('头像存进了 角色.json', castJson.characters[0].avatar === '🖋️', JSON.stringify(castJson.characters[0]))
+    ok('人物卡.txt 里也带头像', fs.readFileSync(path.join(ROOT, NEW2, '人物卡.txt'), 'utf8').indexOf('【🖋️ 苏晚】') >= 0)
+  }
 } finally {
   try {
     fs.rmSync(ROOT, { recursive: true, force: true })

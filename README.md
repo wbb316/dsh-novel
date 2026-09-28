@@ -1,10 +1,10 @@
-# dsh-novel 🖋️
+﻿# dsh-novel 🖋️
 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![DSH](https://img.shields.io/badge/DSH-0.1.5%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
 [![sidebar](https://img.shields.io/badge/needs-dsh--better--sidebar-7e57c2.svg)](https://github.com/omdsh-dev/DSH-better-sidebar)
-[![tests](https://img.shields.io/badge/tests-686%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
+[![tests](https://img.shields.io/badge/tests-755%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
 
 DSH 插件：**小说创作台**。管你的小说项目（大纲 / 世界观 / 角色 & 关系 / 章节），
 一半给 agent 用（`novel_*` 工具），一半给人用（右侧栏「小说」面板）。
@@ -55,9 +55,18 @@ dsh plugin --profile web add link:D:/dsh-novel-plugin
 **📚 小说库**：记住「你正在写哪本」+「每本读到哪一章」；书名那行点开就是列表（搜索 / 排序 / 进度 / 上次看到）；
 可以就地改名、删除（**删除 = 移到回收站**，不是真删）。
 
-**👥 角色 & 关系**：角色卡增删改，关系用「从谁 → 什么关系 → 到谁」，**关系图可以拖**，位置记在本地。
+**👥 角色 & 关系**：角色卡增删改（带头像 emoji，会画在关系图的圆点上），关系用
+「从谁 → 什么关系 → 到谁」，**关系图节点可以拖**，位置记在本地。
+
+**✍️ 章节自己也能写**：点「＋ 新章节」建个空章节，直接在面板里写正文（Ctrl+S 保存，
+`.txt` 按纯文本存）；改名、删除、**按住拖动排序**（松手自动重新编号）都在同一行。
 
 **📂 保存位置可配置**：小说存哪个目录由你定，**目录不存在会自动创建**。
+
+**⇪ 老格式一键迁移**：老项目（`outline.md` 那套）在设定页会提示，点一下转成新格式，
+**原件搬进 `_旧格式备份\`**，不删。
+
+**⬇ 导出设定集**：把大纲 + 世界观 + 人物卡 + 章节清单合成一个 `设定集.txt` 放进小说目录。
 
 ---
 
@@ -141,7 +150,7 @@ C:\Users\<你>\.dsh\profiles\<profile>\package.json
 | `novel_list` | 列出所有小说 + 章节 + 角色数 |
 | `novel_read` | 读大纲 / 世界观 / 人物卡 / 某一章正文 |
 | `novel_context` | **一次取全「续写下一章」所需上下文**（大纲 + 世界观 + 角色关系 + 最近 N 章） |
-| `novel_save_chapter` | 存盘，文件名自动编号 `第NNN章-标题.md` |
+| `novel_save_chapter` | 存盘，文件名自动编号 `第NNN章-标题.txt` |
 | `novel_cast` | 读 / 增删改**角色与人物关系**；不传操作参数就是只读 |
 
 `novel_cast` 的用法（关系两端写角色名或 id 都行）：
@@ -170,8 +179,10 @@ C:\Users\<你>\.dsh\profiles\<profile>\package.json
 | `POST /novel/api/cast` | `{novel, cast}` 整表保存，或 `{novel, ops}` 增量改 |
 | `POST /novel/api/save` | 存 `outline.md` / `world.md` / `chapters\*.md` |
 | `GET  /novel/api/stream?session=` | **流式输出**：正在写的字 + 预览类型（chapter/text/reasoning） |
-| `POST /novel/api/chapter` | 章节 `rename` / `delete` |
-| `POST /novel/api/novel` | 新建小说（建目录 + 四份模板） |
+| `POST /novel/api/chapter` | 章节 `create`（空章节）/ `rename` / `delete` / `reorder`（重新编号） |
+| `POST /novel/api/migrate` | 老格式一键迁移（原件搬进 `_旧格式备份\`） |
+| `POST /novel/api/export` | 导出 `设定集.txt`（大纲 + 世界观 + 人物卡 + 章节清单） |
+| `POST /novel/api/novel` | 小说 `create` / `rename` / `delete`（删除 = 移到回收站） |
 
 ⚠️ 路由是**按路径**注册的：`/novel/api/cast` 的 GET 和 POST 是**同一条路由**，
 方法在 handler 里按 `req.method` 分。分成两条会抛 `duplicate exact route`，整个 API 全废（真踩过）。
@@ -241,7 +252,7 @@ node test-save.mjs        # 写盘全链路（临时小说里真建真删：新�
 node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 桩打到真路由
 ```
 
-目前 **686 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
+目前 **755 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
 
 | 测试 | 在哪跑 | 会留下什么 |
 |---|---|---|
@@ -321,8 +332,8 @@ node probe-client-bundle.mjs dsh-novel D:\dsh-novel-plugin\lib\client.js
 
 ## 🚧 还没做
 
-- 章节的新建（空章节）/ 拖拽排序
-- 关系图的手动拖拽布局（现在是自动摆圈）
-- 角色头像 / 导出设定集
-- 面板里直接改章节正文（现在正文由 agent 写，面板只看）
-- 老格式一键迁移（现在**只兼容、不搬家** —— 想搬随时说）
+- 章节的**多级**结构（卷 / 章）—— 现在只有平铺的章节
+- 关系图手动拖过之后的**自动布局**（按关系亲疏摆位，而不是圆圈）
+- 角色头像用**图片**（现在只能是 emoji / 字符，因为要保证项目里只有纯文本 + json）
+- 导出成 **epub / docx**（现在只导出 `设定集.txt`）
+- 多设备同步（小说库记忆现在存在浏览器本地，手机上打开是另一套）

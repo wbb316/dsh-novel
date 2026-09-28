@@ -576,6 +576,104 @@ try {
 
     for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.txt'))) fs.unlinkSync(path.join(dir, f))
   }
+  console.log('\n── 15. 新建空章节 / 一键迁移 / 导出设定集 ──')
+  {
+    const dir = path.join(tempDir, 'chapters')
+    for (const f of fs.readdirSync(dir)) fs.unlinkSync(path.join(dir, f))
+
+    // ── 新建空章节 ──
+    const c1 = await call('POST', '/novel/api/chapter', { body: { novel: TEMP, action: 'create', title: '新的开始' } })
+    ok('新建 200', c1.status === 200, c1.json?.message)
+    ok('文件名自动编号', c1.json?.created === '第001章-新的开始.txt', c1.json?.created)
+    const body1 = fs.readFileSync(path.join(dir, '第001章-新的开始.txt'), 'utf8')
+    ok('骨架里有标题行', body1.indexOf('第1章 新的开始') === 0, JSON.stringify(body1))
+    ok('留了空行等正文', body1.trim().split('\n').length === 1)
+    ok('返回了新状态', c1.json?.novelState?.chapterCount === 1)
+
+    const c2 = await call('POST', '/novel/api/chapter', { body: { novel: TEMP, action: 'create', title: '第二段' } })
+    ok('再建一章编号 +1', c2.json?.created === '第002章-第二段.txt', c2.json?.created)
+    const c3 = await call('POST', '/novel/api/chapter', { body: { novel: TEMP, action: 'create', title: '   ' } })
+    ok('空标题 → 400', c3.status === 400, c3.json?.message)
+    const c4 = await call('POST', '/novel/api/chapter', { body: { novel: TEMP, action: 'create', title: 'a/b:c' } })
+    ok('标题里的非法字符被清掉', c4.json?.created === '第003章-abc.txt', c4.json?.created)
+
+    // ── 导出设定集 ──
+    const ex = await call('POST', '/novel/api/export', { body: { novel: TEMP } })
+    ok('导出 200', ex.status === 200, ex.json?.message)
+    ok('文件名是 设定集.txt', ex.json?.file === '设定集.txt', ex.json?.file)
+    const bundle = fs.readFileSync(path.join(tempDir, '设定集.txt'), 'utf8')
+    ok('有书名和时间', bundle.indexOf('《' + TEMP + '》设定集') === 0 && bundle.indexOf('导出时间：') > 0)
+    for (const sec of ['一、大纲', '二、世界观', '三、角色与人物关系', '四、章节清单']) {
+      ok('有「' + sec + '」', bundle.indexOf(sec) >= 0)
+    }
+    ok('章节清单里有刚建的章', bundle.indexOf('第1章 新的开始') >= 0)
+    ok('结尾有统计', /共 \d+ 章，约 \d+ 字/.test(bundle), (bundle.match(/共 \d+ 章，约 \d+ 字/) || [''])[0])
+
+    // ── 一键迁移：拿一部老格式的书来转 ──
+    const OLDBOOK = '__自测老书迁移__'
+    const oldDir = path.join(ROOT, OLDBOOK)
+    extra.push(OLDBOOK)
+    fs.mkdirSync(path.join(oldDir, 'chapters'), { recursive: true })
+    fs.writeFileSync(path.join(oldDir, 'outline.md'), '# 我的大纲\n\n## 一句话\n**很酷**的故事\n', 'utf8')
+    fs.writeFileSync(path.join(oldDir, 'world.md'), '# 世界观\n\n- 现代\n', 'utf8')
+    fs.writeFileSync(path.join(oldDir, 'characters.md'), '# 人物卡（手写的）\n\n苏晚：嘴硬\n', 'utf8')
+    fs.writeFileSync(
+      path.join(oldDir, 'characters.json'),
+      JSON.stringify({
+        version: 1,
+        characters: [{ id: 'c1', name: '苏晚', role: '主角', avatar: '🖋️' }],
+        relations: []
+      }),
+      'utf8'
+    )
+    fs.writeFileSync(path.join(oldDir, 'chapters', '第001章-开头.md'), '# 第1章 开头\n\n**正文**来了\n', 'utf8')
+    fs.writeFileSync(path.join(oldDir, 'chapters', '第002章-继续.md'), '# 第2章 继续\n\n> 引用\n', 'utf8')
+
+    ok('迁移前是老格式', scanNovel(OLDBOOK).legacy === true)
+
+    const mg = await call('POST', '/novel/api/migrate', { body: { novel: OLDBOOK } })
+    ok('迁移 200', mg.status === 200, mg.json?.message)
+    ok('报告了改了什么', Array.isArray(mg.json?.changed) && mg.json.changed.length >= 5, (mg.json?.changed || []).join(' / '))
+    ok('说了备份目录', mg.json?.backupDir === '_旧格式备份', String(mg.json?.backupDir))
+
+    ok('大纲变成 大纲.txt', fs.existsSync(path.join(oldDir, '大纲.txt')))
+    ok('大纲是纯文本', !/[#*]/.test(fs.readFileSync(path.join(oldDir, '大纲.txt'), 'utf8')))
+    ok('世界观也转了', fs.existsSync(path.join(oldDir, '世界观.txt')))
+    ok('角色数据变成 角色.json', fs.existsSync(path.join(oldDir, '角色.json')))
+    ok(
+      '人物卡按 json 重新生成（带头像）',
+      fs.readFileSync(path.join(oldDir, '人物卡.txt'), 'utf8').indexOf('【🖋️ 苏晚】') >= 0
+    )
+    ok('章节 .md → .txt', fs.existsSync(path.join(oldDir, 'chapters', '第001章-开头.txt')))
+    ok('章节正文抹掉了 markdown', !/[#*]/.test(fs.readFileSync(path.join(oldDir, 'chapters', '第001章-开头.txt'), 'utf8')))
+    ok('第二章也转了', fs.existsSync(path.join(oldDir, 'chapters', '第002章-继续.txt')))
+
+    ok('原件都在备份目录里', fs.existsSync(path.join(oldDir, '_旧格式备份', 'outline.md')))
+    ok('备份里也有章节', fs.existsSync(path.join(oldDir, '_旧格式备份', 'chapters', '第001章-开头.md')))
+    ok(
+      '备份的是原始 markdown（没被改）',
+      fs.readFileSync(path.join(oldDir, '_旧格式备份', 'outline.md'), 'utf8').indexOf('# 我的大纲') >= 0
+    )
+    ok('老文件不在原地了（是搬走不是复制）', !fs.existsSync(path.join(oldDir, 'outline.md')))
+
+    const after = scanNovel(OLDBOOK)
+    ok('迁移后 legacy 变 false', after.legacy === false, String(after.legacy))
+    ok(
+      '设定报的是新名字',
+      after.settings.map((x) => x.file).join(',') === '大纲.txt,世界观.txt,人物卡.txt',
+      after.settings.map((x) => x.file).join(',')
+    )
+    ok('章节数没变', after.chapterCount === 2, String(after.chapterCount))
+    ok('标题没变', after.chapters.map((c) => c.title).join(',') === '开头,继续', after.chapters.map((c) => c.title).join(','))
+
+    const again = await call('POST', '/novel/api/migrate', { body: { novel: OLDBOOK } })
+    ok('再迁一次什么都不做（幂等）', (again.json?.changed || []).length === 0, (again.json?.changed || []).join(','))
+
+    const ghost = await call('POST', '/novel/api/migrate', { body: { novel: '__没这本书__' } })
+    ok('迁不存在的 → 400', ghost.status === 400)
+    const ghost2 = await call('POST', '/novel/api/export', { body: { novel: '__没这本书__' } })
+    ok('导出不存在的 → 400', ghost2.status === 400)
+  }
 } finally {
   cleanup()
   console.log('\n🧹 已清理临时小说：' + TEMP + ' / ' + LEGACY)
