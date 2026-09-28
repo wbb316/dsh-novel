@@ -1291,14 +1291,54 @@ try {
       const circleAfter = findAll(node2, (n) => n.type === 'circle')[0]
       ok('拖动后圆点位置变了', circleAfter.props.cx !== x0 && circleAfter.props.cx === 100, `cx: ${x0} → ${circleAfter.props.cx}`)
       ok('位置记进了小说库', String(store.get('dsh-novel:library')).indexOf('"x":100') >= 0)
-      ok('出现了「重置布局」', !!btn(t, '重置布局'))
+      ok('出现了「🕸 自动布局」', !!btn(t, '自动布局'))
 
       byClass(t, 'dn_graph')[0].props.onPointerUp()
       t = await settle(p.rt, p.Panel, { visible: true })
-      click(btn(t, '重置布局'))
+      click(btn(t, '自动布局'))
       t = await settle(p.rt, p.Panel, { visible: true })
-      ok('重置后回到自动摆圈', String(store.get('dsh-novel:library')).indexOf('"x":100') < 0)
-      ok('重置后按钮也收起来了', !btn(t, '重置布局'))
+      ok('点自动布局后清掉了手动位置', String(store.get('dsh-novel:library')).indexOf('"x":100') < 0)
+      ok('按钮也收起来了', !btn(t, '自动布局'))
+
+      // ── 力导向布局本身（纯函数，直接在 __test 上量） ──
+      const T = m.__test;
+      const G = [ { id: 'c1', name: '苏晚' }, { id: 'c2', name: '林知夏' }, { id: 'c3', name: '闺蜜' }, { id: 'c4', name: '老师' }, { id: 'c5', name: '路人' } ];
+      const E = [ { from: 'c1', to: 'c2', type: '暗恋' }, { from: 'c2', to: 'c3', type: '闺蜜' } ];
+      const L1 = T.layoutGraph(G, E, 320, 220);
+      const L2 = T.layoutGraph(G, E, 320, 220);
+      ok('布局是确定性的（同样输入，两次一模一样）', JSON.stringify(L1) === JSON.stringify(L2));
+      ok('每个角色都有位置', G.every((c) => L1[c.id] && typeof L1[c.id].x === 'number' && typeof L1[c.id].y === 'number'));
+      ok('都在画布范围内', G.every((c) => L1[c.id].x >= 0 && L1[c.id].x <= 320 && L1[c.id].y >= 0 && L1[c.id].y <= 220));
+      const dist = (p, q) => Math.sqrt((p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y));
+      const minPair = (() => {
+        let mn = Infinity;
+        for (let i = 0; i < G.length; i += 1) for (let j = i + 1; j < G.length; j += 1) mn = Math.min(mn, dist(L1[G[i].id], L1[G[j].id]));
+        return mn;
+      })();
+      ok('圆点不叠在一起（留了最小间距）', minPair >= T.NODE_R * 2, `最近两点 ${minPair.toFixed(1)}px（圆点直径 ${T.NODE_R * 2}）`);
+      const edgeLen = E.map((r) => dist(L1[r.from], L1[r.to]));
+      const nonEdgeLen = [];
+      for (let i = 0; i < G.length; i += 1) for (let j = i + 1; j < G.length; j += 1) {
+        const pair = G[i].id + '>' + G[j].id;
+        const has = E.some((r) => r.from + '>' + r.to === pair || r.to + '>' + r.from === pair);
+        if (!has) nonEdgeLen.push(dist(L1[G[i].id], L1[G[j].id]));
+      }
+      const avg = (a) => a.reduce((s, v) => s + v, 0) / a.length;
+      ok('有关系的比没关系平均更近（这才叫"按亲疏摆位"）', avg(edgeLen) < avg(nonEdgeLen), `${avg(edgeLen).toFixed(1)} < ${avg(nonEdgeLen).toFixed(1)}`);
+      ok('一个关系都没有时退回摆圈（不会全挤成一坨）', (() => {
+        const R = T.layoutGraph(G, [], 320, 220);
+        const ds = [];
+        for (let i = 0; i < G.length; i += 1) for (let j = i + 1; j < G.length; j += 1) ds.push(dist(R[G[i].id], R[G[j].id]));
+        return Math.min.apply(null, ds) > T.NODE_R * 2;
+      })());
+      ok('只有一个角色也能画（在正中间）', (() => {
+        const one = T.layoutGraph([{ id: 'c1', name: '苏晚' }], [], 320, 220);
+        return one.c1.x === 160 && one.c1.y === 110;
+      })());
+      ok('关系指向不存在的角色也不炸', (() => {
+        const bad = T.layoutGraph(G, [{ from: 'c1', to: '不存在' }], 320, 220);
+        return G.every((c) => bad[c.id]);
+      })());
     }
 
     // ── 删掉一本 ──
