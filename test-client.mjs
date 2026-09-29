@@ -391,7 +391,7 @@ try {
     const row = byClass(tree, 'dn_bookrow')[0]
     ok('书名行显示当前这本', !!row && treeText(row).indexOf(NOVEL_A) >= 0, row ? treeText(row) : '(没有)')
     ok('书名行可点（能换本）', !!row && hasClass(row, 'pick'))
-    ok('书名行带进度（章数/角色/多久前写过）', !!row && /章 · 角色 \d+ 人 ·/.test(treeText(row)), row ? treeText(row) : '')
+    ok('书名行带进度（章数/角色分档/多久前写过）', !!row && /章 · 角色 \d+ 人（重要 \d+ · 路人 \d+）·/.test(treeText(row)), row ? treeText(row) : '')
   }
   ok('自动打开最新章节', byClass(tree, 'dn_pre').length === 1)
   ok('正文是真内容', treeText(byClass(tree, 'dn_pre')[0]).indexOf('苏晚，你又在写悲剧') >= 0)
@@ -1504,11 +1504,34 @@ try {
       ok('「到」里不列刚选的「从」（不能自己对自己）', !toVals.includes('c1'), toVals.join(','))
       ok('「到」里有另一个人', toVals.includes('c2'), toVals.join(','))
     }
+    // ── 分档：路人也进表，放「不重要」那一档（用户的明确要求） ──
+    {
+      ok('角色列表按分档分组（有「重要」小节）', treeText(t).indexOf('重要（2）') >= 0, treeText(byClass(t, 'dn_rows')[0] || {}).slice(0, 30))
+      click(btn(t, '新角色'))
+      t = await settle(p.rt, p.Panel, props21)
+      setValue(fieldBox(t, '名字'), '店长')
+      t = await settle(p.rt, p.Panel, props21)
+      ok('编辑区有「分档」下拉', !!fieldBox(t, '分档'))
+      setValue(fieldBox(t, '定位'), '路人')
+      t = await settle(p.rt, p.Panel, props21)
+      setValue(fieldBox(t, '分档'), '不重要')
+      t = await settle(p.rt, p.Panel, props21)
+      const all = treeText(t)
+      ok('列表里出现「不重要」小节', all.indexOf('不重要 —— 路人 / 龙套等（1）') >= 0, all.slice(all.indexOf('重要', all.indexOf('dn_rows') >= 0 ? 0 : 0)).slice(0, 40))
+      ok('路人在「不重要」那一节里', all.indexOf('不重要 —— 路人') < all.indexOf('店长', all.indexOf('不重要 —— 路人')))
+    }
     click(btn(t, '保存角色表'))
     t = await settle(p.rt, p.Panel, props21)
     const castJson = JSON.parse(fs.readFileSync(path.join(ROOT, NEW2, '角色.json'), 'utf8'))
     ok('头像存进了 角色.json', castJson.characters[0].avatar === '🖋️', JSON.stringify(castJson.characters[0]))
     ok('人物卡.txt 里也带头像', fs.readFileSync(path.join(ROOT, NEW2, '人物卡.txt'), 'utf8').indexOf('【🖋️ 苏晚】') >= 0)
+    {
+      const card = fs.readFileSync(path.join(ROOT, NEW2, '人物卡.txt'), 'utf8')
+      ok('人物卡.txt 按分档分了两节', card.indexOf('════ 重要角色（2）════') >= 0 && card.indexOf('════ 不重要') >= 0, card.split('\n').filter((l) => l.startsWith('════')).join(' | '))
+      ok('路人写进了人物卡，身份也标了', card.indexOf('【店长】 路人') >= 0)
+      const after = card.split('════ 不重要')[1] || ''
+      ok('路人确实在不重要那一节里', after.indexOf('【店长】') >= 0 && after.indexOf('【苏晚】') < 0)
+    }
 
     // ── 图片头像：点「换图片头像」→（桩出来的）选图 → 读成 dataURL 交给宿主存盘 ──
     {

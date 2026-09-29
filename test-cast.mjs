@@ -10,7 +10,8 @@ import {
   applyCastOps,
   renderCastText,
   resolveRef,
-  castSummary
+  castSummary,
+  castTiers
 } from './lib/cast.js'
 
 let failed = 0
@@ -154,6 +155,49 @@ console.log('\n── 4. renderCastText：纯文本人物卡（记事本能直�
   const empty = renderCastText(emptyCast())
   ok('空表也说得清', empty.includes('还没有角色'))
   ok('空表总表写暂无', empty.includes('（暂无）'))
+  ok('全是重要角色时不加小节标题（老输出不变）', !txt.includes('════ 重要角色'))
+}
+
+console.log('\n── 4b. 分档：重要 / 不重要（路人也要进表） ──')
+{
+  // 不写 tier 就按定位猜
+  const { cast } = normalizeCast({
+    characters: [
+      { id: 'c1', name: '苏晚', role: '主角' },
+      { id: 'c2', name: '店长', role: '路人' },
+      { id: 'c3', name: '周晓', role: '配角' },
+      { id: 'c4', name: '神秘人', role: '路人', tier: '重要' }, // 显式指定优先
+      { id: 'c5', name: '同班同学', role: '龙套' }
+    ]
+  })
+  const by = (n) => cast.characters.find((c) => c.name === n)
+  ok('主角 → 重要', by('苏晚').tier === '重要', by('苏晚').tier)
+  ok('配角 → 重要', by('周晓').tier === '重要', by('周晓').tier)
+  ok('路人 → 不重要（自动）', by('店长').tier === '不重要', by('店长').tier)
+  ok('龙套 → 不重要（自动）', by('同班同学').tier === '不重要', by('同班同学').tier)
+  ok('写了 tier 就听 tier（路人也能是重要的）', by('神秘人').tier === '重要', by('神秘人').tier)
+  ok('关系是可选的：这些人都没有关系也没报错', cast.relations.length === 0)
+
+  const t = castTiers(cast)
+  ok('分档统计对', t.major === 3 && t.minor === 2 && t.total === 5, JSON.stringify(t))
+
+  const txt = renderCastText(cast)
+  ok('两档都有 → 出现两个小节标题', txt.includes('════ 重要角色（3）════') && txt.includes('════ 不重要'), txt.split('\n').filter((l) => l.startsWith('════')).join(' | '))
+  ok('路人也在人物卡里（带身份）', txt.includes('【店长】 路人'))
+  ok('头像用姓氏时不重复（不写成「苏 苏晚」）', renderCastText({ characters: [{ name: '苏晚', role: '主角', avatar: '苏' }] }).includes('【苏晚】 主角'))
+  ok('头像用 emoji 时照旧带上', renderCastText({ characters: [{ name: '苏晚', role: '主角', avatar: '🖋️' }] }).includes('【🖋️ 苏晚】 主角'))
+  ok('不重要的那一节里确实是不重要的人', (() => {
+    const parts = txt.split('════ 不重要')
+    return parts.length === 2 && parts[1].includes('【店长】') && !parts[1].includes('【苏晚】')
+  })())
+
+  // 工具的增量接口也要认 tier
+  const up = applyCastOps(cast, { addCharacters: [{ name: '隔壁班女生', role: '路人', desc: '只出现一次' }] })
+  const added = up.cast.characters.find((c) => c.name === '隔壁班女生')
+  ok('addCharacters 收 tier（路人自动进不重要）', added && added.tier === '不重要', added && added.tier)
+  const up2 = applyCastOps(up.cast, { updateCharacters: [{ name: '隔壁班女生', tier: '重要' }] })
+  ok('updateCharacters 能改档', up2.cast.characters.find((c) => c.name === '隔壁班女生').tier === '重要')
+  ok('日志里写了档位', up.log.join(' ').includes('不重要'), up.log.join(' '))
 }
 
 console.log('\n── 5. parseCastJson：文件坏了也能开面板 ──')
