@@ -4,7 +4,7 @@
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![DSH](https://img.shields.io/badge/DSH-0.1.5%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
 [![sidebar](https://img.shields.io/badge/needs-dsh--better--sidebar-7e57c2.svg)](https://github.com/omdsh-dev/DSH-better-sidebar)
-[![tests](https://img.shields.io/badge/tests-1096%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
+[![tests](https://img.shields.io/badge/tests-1197%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
 [![release](https://img.shields.io/github/v/release/wbb316/dsh-novel?label=release&color=success)](https://github.com/wbb316/dsh-novel/releases)
 
 DSH 插件：**小说创作台**。管你的小说项目（大纲 / 世界观 / 角色 & 关系 / 章节），
@@ -59,9 +59,15 @@ dsh plugin --profile web add link:D:/dsh-novel-plugin
 **📚 小说库**：记住「你正在写哪本」+「每本读到哪一章」；书名那行点开就是列表（搜索 / 排序 / 进度 / 上次看到）；
 可以就地改名、删除（**删除 = 移到回收站**，不是真删）。
 
-**👥 角色 & 关系**：角色卡增删改（头像可以是 **emoji / 姓氏**，也可以**上传图片** —— 图片存进 `头像\` 目录，`角色.json` 里只记路径），
-关系用「从谁 → 什么关系 → 到谁」；**关系图自动按亲疏摆位**（力导向：关系多的居中、关系近的挨着，不再是干巴巴一个圈），
-节点还能手动拖，位置记在本地。
+**👥 角色 & 关系**：角色分**重要 / 不重要**两档（**剧情里出现过的每个人都该在这儿** —— 带名字的路人也记，放「不重要」并标明身份，比如「路人」）；
+头像可以是 **emoji / 姓氏**，也可以**上传图片**（图片存进 `头像\` 目录，`角色.json` 里只记路径）；
+关系**可选**，用「从谁 → 什么关系 → 到谁」；**关系图自动按亲疏摆位**（力导向：关系多的居中、关系近的挨着），节点还能手动拖。
+
+**📋 剧情（任务栏）**：把大纲拆成一条条**情节点**，按卷分组；每个情节点可以**挂 0~N 章**
+（一个剧情写好幾章），**一章也能挂好几个情节点**；点 ☐/☑ **手动标记写完**，
+另外宿主会按「挂的章节都有正文」算出**自动已写**（手勾优先，把正文删了自动那勾会自己掉）；
+每卷还能写一段**纲领**（这一卷这十几章往哪走）。情节点里可以勾「出场角色」——
+没记过的名字就地「＋ 记成路人」。点「✍️ 写下一章」时会**自动带上还没写的情节点 + 本卷纲领**。
 
 **✍️ 章节自己也能写**：点「＋ 新章节」建个空章节，直接在面板里写正文（Ctrl+S 保存，
 `.txt` 按纯文本存）；改名、删除、**按住拖动排序**（松手自动重新编号）都在同一行。
@@ -81,14 +87,16 @@ EPUB/DOCX 是**自己写的 ZIP 打包器**（只用 Node 内置 `zlib`，零依
 ## 📁 目录结构
 
 **每部小说就是一个文件夹**。正文和设定都是**纯文本**（双击记事本就能改），
-只有角色关系是结构化数据 —— 因为关系是数据，不是散文：
+只有"结构化的东西"才是 json —— 角色关系、剧情表都是数据，不是散文：
 
 ```
 D:\dsh-novel\我的第一本小说\
-├── 大纲.txt          人写、AI 读
+├── 大纲.txt          人写、AI 读（随手写的散文/灵感）
 ├── 世界观.txt        人写、AI 读
 ├── 人物卡.txt        自动生成，给人/AI 看的镜像（别手改）
-├── 角色.json         数据源：角色 + 关系（面板「角色」页在改它）
+├── 角色.json         数据源：角色（分重要/不重要）+ 关系（面板「角色」页在改它）
+├── 剧情.json         数据源：情节点 + 挂的章节 + 手勾状态 + 卷纲领（面板「剧情」页在改它）
+├── 剧情.txt          自动生成，给人/AI 看的镜像（别手改）
 └── chapters\
     ├── 第001章-开场.txt
     └── 第002章-第一次见面.txt
@@ -191,6 +199,8 @@ C:\Users\<你>\.dsh\profiles\<profile>\package.json
 | `GET  /novel/api/stream?session=` | **流式输出**：正在写的字 + 预览类型（chapter/text/reasoning） |
 | `POST /novel/api/chapter` | 章节 `create`（空章节，可带 `volume`）/ `rename` / `delete` / `reorder`（重新编号 + 挪卷） |
 | `POST /novel/api/volume` | 卷 `create` / `rename` / `delete`（删卷 = 整卷进回收站） |
+| `GET  /novel/api/plot?novel=` | **剧情表** + 进度（含"自动已写"判定）+ 章节/卷/角色（面板一次拿全） |
+| `POST /novel/api/plot` | 整表保存剧情（同时渲染 `剧情.txt`） |
 | `POST /novel/api/migrate` | 老格式一键迁移（原件搬进 `_旧格式备份\`） |
 | `POST /novel/api/export` | 导出 `设定集.txt` / **EPUB** / **Word**（`{format}`） |
 | `POST /novel/api/novel` | 小说 `create` / `rename` / `delete`（删除 = 移到回收站） |
@@ -267,7 +277,7 @@ node test-ebook.mjs       # EPUB / DOCX：自写 readZip 往返比对 + w:t 必�
 node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 桩打到真路由
 ```
 
-目前 **1096 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
+目前 **1197 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
 
 | 测试 | 在哪跑 | 会留下什么 |
 |---|---|---|
@@ -275,6 +285,7 @@ node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 
 | `test-api.mjs` | 同上，但只做 GET 和注定 400 的写请求 | 无 |
 | `test-bom.mjs` | 仓库自己 + 临时小说根目录 | 无（整目录删掉）；它会**照原样复刻 dsh web 启动那一步**，BOM 一出现就红 |
 | `test-volume.mjs` / `test-avatar.mjs` / `test-ebook.mjs` | 系统临时目录 | 无（整目录删掉）—— 卷、图片头像、EPUB/DOCX 都在这三个里 |
+| `test-plot.mjs` | 系统临时目录 | 无 —— **剧情表**（情节点、挂章节、手勾 vs 自动、卷纲领） |
 | `test-client.mjs` / `test-config.mjs` | 系统临时目录 / 临时配置文件 | 无（整目录删掉） |
 
 > 早期版本这里踩过一次：`test-save` 把临时作品"删除"进真实回收站，清理却只删了原路径，

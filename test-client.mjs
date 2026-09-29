@@ -1587,6 +1587,51 @@ try {
       delete globalThis.FileReader;
     }
 
+    // ── 剧情页：加情节点 / 点勾 / 挂章节 / 出场角色 ──
+    {
+      click(findAll(t, (n) => n.type === 'button' && textOf(n).indexOf('剧情') === 0)[0]);
+      t = await settle(p.rt, p.Panel, props21);
+      ok('有「＋ 新剧情点」', !!btn(t, '新剧情点'));
+      ok('还没有情节点时有说明', treeText(t).indexOf('还没有情节点') >= 0, treeText(t).slice(-40));
+      click(btn(t, '新剧情点'));
+      t = await settle(p.rt, p.Panel, props21);
+      setValue(findAll(byClass(t, 'dn_chrename')[0], (n) => n.type === 'input')[0], '第3章 契约：两人约定「只是练习」');
+      t = await settle(p.rt, p.Panel, props21);
+      click(btn(t, '加情节点'));
+      t = await settle(p.rt, p.Panel, props21);
+      ok('加完有提示', treeText(t).indexOf('加了一个情节点') >= 0, treeText(t).slice(-40));
+      ok('磁盘上写了 剧情.json', fs.existsSync(path.join(ROOT, NEW2, '剧情.json')));
+      ok('也渲染了 剧情.txt', fs.existsSync(path.join(ROOT, NEW2, '剧情.txt')));
+      ok('情节点显示在列表里', treeText(t).indexOf('契约') >= 0);
+      ok('顶上有进度', /已写 \d+ \/ \d+/.test(treeText(t)), treeText(t).slice(0, 60));
+      ok('显示了「（还没挂章节）」', treeText(t).indexOf('还没挂章节') >= 0);
+
+      // 点勾 = 手动标成已写
+      click(byClass(t, 'dn_tick')[0]);
+      t = await settle(p.rt, p.Panel, props21);
+      ok('点勾后是「手动」', treeText(byClass(t, 'dn_beat')[0]).indexOf('手动') >= 0, treeText(byClass(t, 'dn_beat')[0]));
+      ok('done 落盘了', JSON.parse(fs.readFileSync(path.join(ROOT, NEW2, '剧情.json'), 'utf8')).beats[0].done === true);
+
+      // 编辑：挂章节 + 出场角色
+      click(findAll(byClass(t, 'dn_beat')[0], (n) => n.type === 'button' && textOf(n) === '✏️')[0]);
+      t = await settle(p.rt, p.Panel, props21);
+      ok('编辑区能挂章节', byClass(t, 'dn_pickitem').length >= 2, String(byClass(t, 'dn_pickitem').length));
+      ok('编辑区能选出场角色（角色表里的人）', treeText(t).indexOf('出场角色') >= 0 && treeText(t).indexOf('苏晚') >= 0);
+      ok('有「＋ 记成路人」的入口', !!btn(t, '记成路人'));
+      const chapterChip = byClass(t, 'dn_pickitem').find((n) => textOf(n).indexOf('第') === 0);
+      click(chapterChip);
+      t = await settle(p.rt, p.Panel, props21);
+      ok('点一下章节 chip 会选中', hasClass(byClass(t, 'dn_pickitem').find((n) => textOf(n).indexOf('第') === 0), 'on'));
+      click(btn(t, '存这个情节点'));
+      t = await settle(p.rt, p.Panel, props21);
+      const saved = JSON.parse(fs.readFileSync(path.join(ROOT, NEW2, '剧情.json'), 'utf8'));
+      ok('挂的章节落盘了', saved.beats[0].chapters.length === 1, JSON.stringify(saved.beats[0].chapters));
+      ok('列表里显示挂到哪一章', treeText(t).indexOf('→ 第') >= 0, treeText(byClass(t, 'dn_beat')[0]));
+
+      // 卷纲领（未分卷那一组 = 全书纲领）
+      ok('有纲领入口', treeText(t).indexOf('纲领') >= 0, treeText(t).slice(-70));
+    }
+
     // ── 卷：新建 / 往卷里加章 / 跨卷拖 / 改名 / 删卷 ──
     {
       click(findAll(t, (n) => n.type === 'button' && textOf(n).indexOf('章节') === 0)[0]);

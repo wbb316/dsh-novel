@@ -71,6 +71,7 @@ const EXPECTED = [
   '/novel/api/save',
   '/novel/api/stream',
   '/novel/api/chapter',
+  '/novel/api/plot',
   '/novel/api/volume',
   '/novel/api/migrate',
   '/novel/api/export',
@@ -79,7 +80,7 @@ const EXPECTED = [
 ]
 
 console.log('── 1. 路由表结构 ──')
-ok('共 12 条路由', API_ROUTES.length === 12, `实际 ${API_ROUTES.length}`)
+ok('共 13 条路由', API_ROUTES.length === 13, `实际 ${API_ROUTES.length}`)
 ok('都是 exact', API_ROUTES.every((r) => r.kind === 'exact'))
 ok('路径齐全且顺序稳定', API_ROUTES.map((r) => r.path).join(',') === EXPECTED.join(','), API_ROUTES.map((r) => r.path).join(','))
 ok('handler 都是函数', API_ROUTES.every((r) => typeof r.handler === 'function'))
@@ -263,8 +264,8 @@ console.log('\n── 8. 挂载到 webServer（模拟 register） ──')
     }
   }
   const n = registerApi(fakeServer)
-  ok('注册了 12 条', n === 12, `实际 ${n}`)
-  ok('表里 12 条', table.size === 12, [...table.keys()].join(', '))
+  ok('注册了 13 条', n === 13, `实际 ${n}`)
+  ok('表里 13 条', table.size === 13, [...table.keys()].join(', '))
   let threw = false
   try {
     registerApi(fakeServer)

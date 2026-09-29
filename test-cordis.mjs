@@ -71,11 +71,11 @@ app.provide('webServer', webServer)
 await tick()
 await tick()
 
-ok('注入钩子自动触发了 → 路由 12 条', webServer.routes.length === 12, `实际 ${webServer.routes.length}`)
+ok('注入钩子自动触发了 → 路由 13 条', webServer.routes.length === 13, `实际 ${webServer.routes.length}`)
 ok(
   '路由路径正确',
   webServer.routes.map((r) => r.path).join(',') ===
-    '/novel/api/list,/novel/api/read,/novel/api/cast,/novel/api/avatar,/novel/api/save,/novel/api/stream,/novel/api/chapter,/novel/api/volume,/novel/api/migrate,/novel/api/export,/novel/api/config,/novel/api/novel',
+    '/novel/api/list,/novel/api/read,/novel/api/cast,/novel/api/avatar,/novel/api/save,/novel/api/stream,/novel/api/chapter,/novel/api/plot,/novel/api/volume,/novel/api/migrate,/novel/api/export,/novel/api/config,/novel/api/novel',
   webServer.routes.map((r) => r.path).join(',')
 )
 ok('都是 exact', webServer.routes.every((r) => r.kind === 'exact'))
