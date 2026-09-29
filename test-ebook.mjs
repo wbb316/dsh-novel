@@ -326,6 +326,17 @@ const dMap = new Map(dz.entries.map((e) => [e.name, e]))
   ok('document.xml 里没有裸的 & 或 <', !RAW_AMP.test(doc))
   ok('标题里的 & / < 转义了', doc.includes('&amp;') && doc.includes('&lt;上&gt;'))
 
+  // ⚠️ 这条是**真 Word 抓出来的 bug**：`w:t` / `w:br` 必须包在 `w:r`（run）里。
+  //    直接挂在 `w:p` 下面是非法 OOXML —— ZIP 能解开、XML 也 well-formed，
+  //    但 Word 会弹"Word 在试图打开文件时遇到错误"，别的检查全都看不出来。
+  {
+    const paragraphs = doc.match(/<w:p>[\s\S]*?<\/w:p>/g) || []
+    const withoutRuns = paragraphs.map((p) => p.replace(/<w:r>[\s\S]*?<\/w:r>/g, ''))
+    const leaked = withoutRuns.filter((p) => /<w:(t|br)\b/.test(p))
+    ok('每个 w:t / w:br 都包在 w:r 里（否则真 Word 打不开）', paragraphs.length > 0 && leaked.length === 0, `漏了 ${leaked.length} 段：${(leaked[0] || '').slice(0, 80)}`)
+    ok('段落里确实有 run', paragraphs.every((p) => /<w:r>/.test(p)))
+  }
+
   ok('styles.xml 定义了 Normal', styles.includes('w:styleId="Normal"'))
   ok('styles.xml 定义了 Heading1 / Heading2', styles.includes('w:styleId="Heading1"') && styles.includes('w:styleId="Heading2"'))
   ok('Normal 是默认样式（w:default="1"）', styles.includes('w:default="1"'))

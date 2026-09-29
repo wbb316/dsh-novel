@@ -362,6 +362,39 @@ node probe-client-bundle.mjs dsh-novel D:\dsh-novel-plugin\lib\client.js
     DSH 那一侧的加固也做了（不只是在插件里躲）：`D:\tools\dsh-app-boot-bom-patch\`
     给 `dsh-app-boot` 打了个补丁，让它读 profile / bundle 的 `package.json` 时自己剥 BOM ——
     **别人**用记事本写出来的插件也不会再把整个 web 打挂。升级 dsh 后重跑一次 `apply.mjs`。
+19. **"我的测试全绿"和"外部工具能打开"是两件事。** 导 DOCX 那次：自己写的 ZIP 能解开、
+    XML well-formed、90 项断言全过 —— 结果**真 Word 直接打不开**，因为 `<w:t>` 没包在
+    `<w:r>` 里（非法 OOXML，但在 XML 层面完全合法，解压工具也看不出）。
+    教训是两条：① **能拿外部标准工具验的，就别只信自己的测试**（EPUB 用 `epubcheck`，
+    DOCX 用真 Word，BOM 用"照原样复刻启动那一步"）；
+    ② **把外部工具抓到的坑写回测试** —— 现在 `test-ebook.mjs` 里有
+    "每个 `w:t`/`w:br` 都必须在 `w:r` 里"，而且我特意把修复撤掉跑过一遍，确认它是**红的**。
+
+---
+
+## 🔍 怎么自己验证 EPUB / Word（这次真踩到了）
+
+导出的 `.epub` / `.docx` 是**自己写的 ZIP 打包器**打的，所以值得亲自验一遍。
+**我第一版就翻过车**：`<w:t>` 没包在 `<w:r>` 里 —— ZIP 解压正常、XML 也 well-formed、
+我原来那 89 项断言全绿，**但真 Word 弹"Word 在试图打开文件时遇到错误"**。
+所以现在有两条规矩：**能拿外部工具验的，就别只信自己的测试**（见踩坑第 19 条）。
+
+```powershell
+# 1) EPUB：用 W3C 官方的 epubcheck（要 Java 11+）
+#    下载： https://github.com/w3c/epubcheck/releases  （解开就能用）
+java -jar epubcheck.jar "D:\dsh-novel\我的小说\我的小说.epub"
+# 期望： No errors or warnings detected.
+
+# 2) DOCX：用你机器上真的 Word 打开（隐藏窗口，不改文件）
+$w = New-Object -ComObject Word.Application
+$w.Visible = $false; $w.DisplayAlerts = 0
+$d = $w.Documents.Open("D:\dsh-novel\我的小说\我的小说.docx", $false, $true, $false)
+"$($d.Paragraphs.Count) 段 / $($d.ComputeStatistics(2)) 页"
+$d.Close(0); $w.Quit()
+```
+
+最省事的办法：**直接双击**。EPUB 丢进任何阅读器（微信读书 / Calibre / Thorium），
+DOCX 双击用 Word 或 WPS 打开 —— 能翻页、标题有层级、没有 `#` `**` 这种记号，就是对的。
 
 ---
 

@@ -46,6 +46,7 @@ const {
   reorderChapters,
   migrateNovel,
   exportNovel,
+  plainForEbook,
   listVolumes,
   TRASH_DIR
 } = await import('./lib/index.js')
@@ -316,6 +317,20 @@ console.log('\n── 9. 导出设定集 ──')
   )
   ok('有分卷统计', /共 \d+ 章（\d+ 卷），约 \d+ 字/.test(txt), txt.split('\n').filter((l) => l.startsWith('共 ')).join(' | '))
   ok('章节行还在', /第\d+章 .+  ——  \d+ 字/.test(txt))
+
+  // 电子书里不能带 markdown 记号、不能重复标题（真 Word 那次 bug 的邻居）
+  ok(
+    '电子书正文会抹掉 markdown 记号',
+    !plainForEbook('# 第1章 甲\n\n**粗体**和 `代码`\n').includes('**') &&
+      !plainForEbook('# 第1章 甲\n\n正文\n').includes('#') &&
+      !plainForEbook('> 引用\n\n- 列表\n').includes('>')
+  )
+  ok(
+    '电子书正文会去掉第一行的「第N章 标题」（标题由结构给，不重复）',
+    plainForEbook('# 第1章 甲\n\n正文\n') === '正文\n' && plainForEbook('第2章 乙\n\n正文\n') === '正文\n',
+    JSON.stringify(plainForEbook('# 第1章 甲\n\n正文\n'))
+  )
+  ok('没带标题的正文原样保留', plainForEbook('正文\n\n第二段\n') === '正文\n\n第二段\n')
 }
 
 // ─────────────── 10. agent 的存稿工具也认卷 ───────────────
