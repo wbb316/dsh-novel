@@ -4,7 +4,7 @@
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![DSH](https://img.shields.io/badge/DSH-0.1.5%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
 [![sidebar](https://img.shields.io/badge/needs-dsh--better--sidebar-7e57c2.svg)](https://github.com/omdsh-dev/DSH-better-sidebar)
-[![tests](https://img.shields.io/badge/tests-1083%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
+[![tests](https://img.shields.io/badge/tests-1088%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
 [![release](https://img.shields.io/github/v/release/wbb316/dsh-novel?label=release&color=success)](https://github.com/wbb316/dsh-novel/releases)
 
 DSH 插件：**小说创作台**。管你的小说项目（大纲 / 世界观 / 角色 & 关系 / 章节），
@@ -261,10 +261,13 @@ node test-schema.mjs      # 工具的 JSON Schema 是否合法 + 只读工具真
 node test-api.mjs         # 假 req/res 打真路由（只读 + 400 错误路径）
 node test-cordis.mjs      # 真 cordis：先给 tools、后给 webServer，验证注入钩子会自己触发
 node test-save.mjs        # 写盘全链路（临时小说里真建真删：新建/角色/存稿/改名/删除）
+node test-volume.mjs      # 卷 / 章：跨卷挪动、卷名排序（第一卷<第二卷<第十卷）、删卷进回收站
+node test-avatar.mjs      # 图片头像：上传/出图/换格式/删除/坏输入/脏数据
+node test-ebook.mjs       # EPUB / DOCX：自写 readZip 往返比对 + w:t 必须在 w:r 里
 node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 桩打到真路由
 ```
 
-目前 **1083 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
+目前 **1088 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
 
 | 测试 | 在哪跑 | 会留下什么 |
 |---|---|---|
