@@ -1630,6 +1630,22 @@ try {
 
       // 卷纲领（未分卷那一组 = 全书纲领）
       ok('有纲领入口', treeText(t).indexOf('纲领') >= 0, treeText(t).slice(-70));
+
+      // ⚠️ 情节点挂在「还没建的卷」上时也必须显示 —— 否则它会凭空消失（用户会以为丢数据了）
+      {
+        const pj = path.join(ROOT, NEW2, '剧情.json');
+        const pjData = JSON.parse(fs.readFileSync(pj, 'utf8'));
+        pjData.beats.push({ id: 'bX', title: '未来的第二卷里的剧情', volume: '第二卷 未来卷', chapters: [], cast: [], done: false, note: '' });
+        fs.writeFileSync(pj, JSON.stringify(pjData, null, 2), 'utf8');
+        // 切走再切回来 = 重新拉一次（PlotView 只在挂载时拉）
+        click(findAll(t, (n) => n.type === 'button' && textOf(n).indexOf('章节') === 0)[0]);
+        t = await settle(p.rt, p.Panel, props21);
+        click(findAll(t, (n) => n.type === 'button' && textOf(n).indexOf('剧情') === 0)[0]);
+        t = await settle(p.rt, p.Panel, props21);
+        const all2 = treeText(t);
+        ok('挂在"还没建的卷"上的情节点不会被吞掉', all2.indexOf('未来的第二卷里的剧情') >= 0, all2.slice(-80));
+        ok('那一卷的分组标题也出现了', all2.indexOf('第二卷 未来卷') >= 0);
+      }
     }
 
     // ── 卷：新建 / 往卷里加章 / 跨卷拖 / 改名 / 删卷 ──
