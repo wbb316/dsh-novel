@@ -1504,9 +1504,10 @@ try {
       ok('「到」里不列刚选的「从」（不能自己对自己）', !toVals.includes('c1'), toVals.join(','))
       ok('「到」里有另一个人', toVals.includes('c2'), toVals.join(','))
     }
-    // ── 分档：路人也进表，放「不重要」那一档（用户的明确要求） ──
+    // ── 分档：两个入口（重要 / 不重要），点进去各看各的 ──
     {
-      ok('角色列表按分档分组（有「重要」小节）', treeText(t).indexOf('重要（2）') >= 0, treeText(byClass(t, 'dn_rows')[0] || {}).slice(0, 30))
+      ok('有「重要的角色」「不重要的角色」两个入口', !!btn(t, '重要的角色') && !!btn(t, '不重要的角色'), treeText(byClass(t, 'dn_tiers')[0] || {}).slice(0, 40))
+      ok('入口上带人数', treeText(byClass(t, 'dn_tiers')[0]).indexOf('重要的角色（2）') >= 0, treeText(byClass(t, 'dn_tiers')[0]))
       click(btn(t, '新角色'))
       t = await settle(p.rt, p.Panel, props21)
       setValue(fieldBox(t, '名字'), '店长')
@@ -1516,9 +1517,13 @@ try {
       t = await settle(p.rt, p.Panel, props21)
       setValue(fieldBox(t, '分档'), '不重要')
       t = await settle(p.rt, p.Panel, props21)
-      const all = treeText(t)
-      ok('列表里出现「不重要」小节', all.indexOf('不重要 —— 路人 / 龙套等（1）') >= 0, all.slice(all.indexOf('重要', all.indexOf('dn_rows') >= 0 ? 0 : 0)).slice(0, 40))
-      ok('路人在「不重要」那一节里', all.indexOf('不重要 —— 路人') < all.indexOf('店长', all.indexOf('不重要 —— 路人')))
+      click(btn(t, '不重要的角色'))
+      t = await settle(p.rt, p.Panel, props21)
+      ok('切到「不重要」能看到店长', treeText(byClass(t, 'dn_rows')[0]).indexOf('店长') >= 0, treeText(byClass(t, 'dn_rows')[0]).slice(0, 30))
+      ok('这一档里没有苏晚', treeText(byClass(t, 'dn_rows')[0]).indexOf('苏晚') < 0)
+      click(btn(t, '重要的角色'))
+      t = await settle(p.rt, p.Panel, props21)
+      ok('切回「重要」看到苏晚、看不到店长', treeText(byClass(t, 'dn_rows')[0]).indexOf('苏晚') >= 0 && treeText(byClass(t, 'dn_rows')[0]).indexOf('店长') < 0, treeText(byClass(t, 'dn_rows')[0]).slice(0, 40))
     }
     click(btn(t, '保存角色表'))
     t = await settle(p.rt, p.Panel, props21)
@@ -1531,6 +1536,56 @@ try {
       ok('路人写进了人物卡，身份也标了', card.indexOf('【店长】 路人') >= 0)
       const after = card.split('════ 不重要')[1] || ''
       ok('路人确实在不重要那一节里', after.indexOf('【店长】') >= 0 && after.indexOf('【苏晚】') < 0)
+    }
+
+    // ── 改名字：先算再问 → 确定 → 全文替换 + 备份（唯一会动正文的操作） ──
+    {
+      const chapDir = path.join(ROOT, NEW2, 'chapters')
+      const chFile = fs.readdirSync(chapDir).sort()[0]
+      const chPath = path.join(chapDir, chFile)
+      fs.writeFileSync(chPath, '第1章 开头\n\n苏晚站在校门口的屋檐下。苏晚没说话。\n', 'utf8')
+      // 切走再切回来 = 重新拉一次角色表（顺便让 savedIds 记上"服务端有这个人"）
+      click(findAll(t, (n) => n.type === 'button' && textOf(n).indexOf('章节') === 0)[0])
+      t = await settle(p.rt, p.Panel, props21)
+      click(findAll(t, (n) => n.type === 'button' && textOf(n).indexOf('角色') === 0)[0])
+      t = await settle(p.rt, p.Panel, props21)
+      click(byClass(t, 'dn_item').find((n) => treeText(n).indexOf('苏晚') >= 0))
+      t = await settle(p.rt, p.Panel, props21)
+
+      setValue(fieldBox(t, '名字'), '苏晚晚')
+      t = await settle(p.rt, p.Panel, props21)
+      ok('改名字会先弹确认（不直接改）', treeText(t).indexOf('名字是很重要的信息') >= 0, treeText(t).slice(-90))
+      ok('确认框里给了"会改几个文件几处"', /个文件 \/ \d+ 处/.test(treeText(t)) || treeText(t).indexOf('只会改角色表') >= 0, treeText(t).slice(-90))
+      ok('确认框说清了会先备份', treeText(t).indexOf('_改名备份') >= 0)
+      ok('还没点确定 → 角色表里的名字没变', JSON.parse(fs.readFileSync(path.join(ROOT, NEW2, '角色.json'), 'utf8')).characters[0].name === '苏晚')
+
+      click(btn(t, '取消'))
+      t = await settle(p.rt, p.Panel, props21)
+      ok('取消后输入框回到原名', String(fieldBox(t, '名字').props.value) === '苏晚', String(fieldBox(t, '名字').props.value))
+      ok('取消后正文一个字没动', fs.readFileSync(chPath, 'utf8').indexOf('苏晚站在') >= 0)
+
+      setValue(fieldBox(t, '名字'), '苏晚晚')
+      t = await settle(p.rt, p.Panel, props21)
+      click(btn(t, '确定改成'))
+      t = await settle(p.rt, p.Panel, props21)
+      ok('改名成功的提示里说了备份到哪', treeText(t).indexOf('_改名备份') >= 0, treeText(t).slice(-80))
+      const bakRoot = path.join(ROOT, NEW2, '_改名备份')
+      ok('备份目录真的建了', fs.existsSync(bakRoot) && fs.readdirSync(bakRoot).length >= 1)
+      const bakHasOld = fs
+        .readdirSync(bakRoot)
+        .some((d) => fs.existsSync(path.join(bakRoot, d, 'chapters', chFile)) && fs.readFileSync(path.join(bakRoot, d, 'chapters', chFile), 'utf8').indexOf('苏晚站在') >= 0)
+      ok('备份里是改之前的正文', bakHasOld)
+      ok('正文里的旧名被换掉了（多处一起换）', fs.readFileSync(chPath, 'utf8').indexOf('苏晚晚站在') >= 0 && fs.readFileSync(chPath, 'utf8').indexOf('苏晚站在') < 0)
+      ok('角色.json 里也是新名', JSON.parse(fs.readFileSync(path.join(ROOT, NEW2, '角色.json'), 'utf8')).characters[0].name === '苏晚晚')
+      ok('列表里显示新名', treeText(byClass(t, 'dn_rows')[0]).indexOf('苏晚晚') >= 0)
+      ok('人物卡.txt 也跟着重生成了', fs.readFileSync(path.join(ROOT, NEW2, '人物卡.txt'), 'utf8').indexOf('苏晚晚】') >= 0)
+
+      // 再改回原名（顺便验证反向替换也对）
+      setValue(fieldBox(t, '名字'), '苏晚')
+      t = await settle(p.rt, p.Panel, props21)
+      click(btn(t, '确定改成'))
+      t = await settle(p.rt, p.Panel, props21)
+      ok('再改回来也行', fs.readFileSync(chPath, 'utf8').indexOf('苏晚站在') >= 0 && JSON.parse(fs.readFileSync(path.join(ROOT, NEW2, '角色.json'), 'utf8')).characters[0].name === '苏晚')
     }
 
     // ── 图片头像：点「换图片头像」→（桩出来的）选图 → 读成 dataURL 交给宿主存盘 ──

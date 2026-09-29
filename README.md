@@ -4,7 +4,7 @@
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![DSH](https://img.shields.io/badge/DSH-0.1.5%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
 [![sidebar](https://img.shields.io/badge/needs-dsh--better--sidebar-7e57c2.svg)](https://github.com/omdsh-dev/DSH-better-sidebar)
-[![tests](https://img.shields.io/badge/tests-1199%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
+[![tests](https://img.shields.io/badge/tests-1255%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
 [![release](https://img.shields.io/github/v/release/wbb316/dsh-novel?label=release&color=success)](https://github.com/wbb316/dsh-novel/releases)
 
 DSH 插件：**小说创作台**。管你的小说项目（大纲 / 世界观 / 角色 & 关系 / 章节），
@@ -59,9 +59,18 @@ dsh plugin --profile web add link:D:/dsh-novel-plugin
 **📚 小说库**：记住「你正在写哪本」+「每本读到哪一章」；书名那行点开就是列表（搜索 / 排序 / 进度 / 上次看到）；
 可以就地改名、删除（**删除 = 移到回收站**，不是真删）。
 
-**👥 角色 & 关系**：角色分**重要 / 不重要**两档（**剧情里出现过的每个人都该在这儿** —— 带名字的路人也记，放「不重要」并标明身份，比如「路人」）；
-头像可以是 **emoji / 姓氏**，也可以**上传图片**（图片存进 `头像\` 目录，`角色.json` 里只记路径）；
-关系**可选**，用「从谁 → 什么关系 → 到谁」；**关系图自动按亲疏摆位**（力导向：关系多的居中、关系近的挨着），节点还能手动拖。
+**👥 角色 & 关系**：角色分**重要 / 不重要**两档，页面上就是两个入口（「重要的角色（N）」「不重要的角色（N）」），
+点哪个看哪个 —— 连带只显示**跟这一档有关**的关系。**剧情里出现过的每个人都该在这儿**：带名字的路人也记，
+放「不重要」并标明身份（比如「路人」）；头像可以是 **emoji / 姓氏**，也可以**上传图片**
+（图片存进 `头像\` 目录，`角色.json` 里只记路径）；关系**可选**，用「从谁 → 什么关系 → 到谁」；
+**关系图自动按亲疏摆位**（力导向：关系多的居中、关系近的挨着），节点还能手动拖。
+
+**✏️ 改角色名 = 全文替换（唯一会动你正文的操作，所以格外小心）**：
+在名字框里改了名字**不会直接生效**，会先弹一段确认，把「会改哪几个文件、各几处」列给你看
+（先算再问）；点确定才动，而且**先把原件整份备份到 `_改名备份\<时间>\`** 再替换。
+替换范围：大纲 / 世界观 / 所有章节正文 / 剧情表里的标题和备注；`人物卡.txt`、`剧情.txt` 是生成的，
+不直接改（会跟着重新生成）。**只有一个字的名字不做全文替换**（「晓」出现在「晓得」里太正常了，盲替换会毁句子），
+这种情况只改角色表并在确认框里说明。刚点「＋ 新角色」**还没保存**的角色直接改就行（正文里不可能有它）。
 
 **📋 剧情（任务栏）**：把大纲拆成一条条**情节点**，按卷分组；每个情节点可以**挂 0~N 章**
 （一个剧情写好幾章），**一章也能挂好几个情节点**；点 ☐/☑ **手动标记写完**，
@@ -192,7 +201,7 @@ C:\Users\<你>\.dsh\profiles\<profile>\package.json
 | `GET  /novel/api/list` | 小说 + 章节 + 卷 + 设定文件 + 角色数 |
 | `GET  /novel/api/read?novel=&file=` | 读一章正文 / 一个设定文件（卷里的章用 `卷名/文件名`） |
 | `GET  /novel/api/cast?novel=` | 读角色表（带 warnings / legacyMd / 图片头像地址） |
-| `POST /novel/api/cast` | `{novel, cast}` 整表保存，或 `{novel, ops}` 增量改 |
+| `POST /novel/api/cast` | `{novel, cast}` 整表保存 / `{novel, ops}` 增量改 / **`{novel, rename:{from,to}, dryRun}` 改角色名**（dryRun 只统计；真改会先备份到 `_改名备份\` 再全文替换） |
 | `GET  /novel/api/avatar?novel=&id=` | **图片头像**出图（没图 404，带正确 Content-Type） |
 | `POST /novel/api/avatar` | 上传头像 `{novel, id, dataUrl}` / 去掉 `{action:'remove'}` |
 | `POST /novel/api/save` | 存 `大纲.txt` / `世界观.txt` / `chapters\*.txt` |
@@ -277,7 +286,7 @@ node test-ebook.mjs       # EPUB / DOCX：自写 readZip 往返比对 + w:t 必�
 node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 桩打到真路由
 ```
 
-目前 **1199 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
+目前 **1255 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
 
 | 测试 | 在哪跑 | 会留下什么 |
 |---|---|---|
@@ -286,6 +295,7 @@ node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 
 | `test-bom.mjs` | 仓库自己 + 临时小说根目录 | 无（整目录删掉）；它会**照原样复刻 dsh web 启动那一步**，BOM 一出现就红 |
 | `test-volume.mjs` / `test-avatar.mjs` / `test-ebook.mjs` | 系统临时目录 | 无（整目录删掉）—— 卷、图片头像、EPUB/DOCX 都在这三个里 |
 | `test-plot.mjs` | 系统临时目录 | 无 —— **剧情表**（情节点、挂章节、手勾 vs 自动、卷纲领） |
+| `test-rename.mjs` | 系统临时目录 | 无 —— **改角色名**（dry-run 统计 / 备份 / 全文替换 / 单字名字不替换） |
 | `test-client.mjs` / `test-config.mjs` | 系统临时目录 / 临时配置文件 | 无（整目录删掉） |
 
 > 早期版本这里踩过一次：`test-save` 把临时作品"删除"进真实回收站，清理却只删了原路径，
