@@ -1477,6 +1477,12 @@ try {
     setValue(fieldBox(t, avatarLabel), '🖋️')
     t = await settle(p.rt, p.Panel, props21)
     ok('角色列表行显示了头像', treeText(byClass(t, 'dn_rows')[0]).indexOf('🖋️') >= 0, treeText(byClass(t, 'dn_rows')[0]).slice(0, 12))
+    // 只有 1 个角色时，不该摆一个只能选自己的关系表单 —— 而要说明差什么
+    ok(
+      '只有 1 个角色时不摆关系表单，而是说明差什么',
+      !btn(t, '添加关系') && treeText(t).indexOf('现在只有 1 个') >= 0,
+      treeText(t).slice(-70)
+    )
     // 只有 1 个角色时关系图不画（画不出线），所以再加一个
     click(btn(t, '新角色'))
     t = await settle(p.rt, p.Panel, props21)
@@ -1485,6 +1491,18 @@ try {
     {
       const texts = findAll(byClass(t, 'dn_graph')[0], (n) => n.type === 'text')
       ok('关系图圆点里画的是头像', texts.some((n) => textOf(n) === '🖋️'), texts.map(textOf).slice(0, 5).join('|'))
+    }
+    // 有 2 个人了 → 关系表单出现，而且不能选自己当关系对象
+    {
+      ok('有 2 个角色了，关系表单出现', !!btn(t, '添加关系'))
+      const sels = findAll(byClass(t, 'dn_addrel')[0], (n) => n.type === 'select')
+      ok('关系表单有「从」「到」两个下拉', sels.length === 2, String(sels.length))
+      setValue(sels[0], 'c1')
+      t = await settle(p.rt, p.Panel, props21)
+      const sels2 = findAll(byClass(t, 'dn_addrel')[0], (n) => n.type === 'select')
+      const toVals = findAll(sels2[1], (n) => n.type === 'option').map((o) => o.props.value)
+      ok('「到」里不列刚选的「从」（不能自己对自己）', !toVals.includes('c1'), toVals.join(','))
+      ok('「到」里有另一个人', toVals.includes('c2'), toVals.join(','))
     }
     click(btn(t, '保存角色表'))
     t = await settle(p.rt, p.Panel, props21)
@@ -1629,6 +1647,30 @@ try {
       ok('卷没了，列表回到只有未分卷', byClass(t, 'dn_vol').length === 1, String(byClass(t, 'dn_vol').length));
       delete globalThis.prompt;
       delete globalThis.confirm;
+    }
+
+    // ── 只有一本小说时，书名那一行也必须能点（小说库里还有改名/删除） ──
+    //    用户就是这么被卡住的："书名这一行是改不了的"
+    {
+      const SOLO = path.join(os.tmpdir(), 'dsh-novel-solo-' + Date.now());
+      fs.mkdirSync(path.join(SOLO, '唯一一本', 'chapters'), { recursive: true });
+      fs.writeFileSync(path.join(SOLO, '唯一一本', '大纲.txt'), '占位\n', 'utf8');
+      fs.writeFileSync(path.join(SOLO, '唯一一本', 'chapters', '第001章-甲.txt'), '第1章 甲\n\n正文\n', 'utf8');
+      const prevRoot = process.env.DSH_NOVEL_ROOT;
+      process.env.DSH_NOVEL_ROOT = SOLO;
+      click(btn(t, '刷新'));
+      t = await settle(p.rt, p.Panel, props21);
+      const row = byClass(t, 'dn_bookrow')[0];
+      ok('只有一本时，书名行也是可点的按钮', !!row && hasClass(row, 'pick') && typeof row.props.onClick === 'function');
+      ok('只有一本也显示 ▾（暗示能点开）', treeText(row).indexOf('▾') >= 0, treeText(row));
+      click(row);
+      t = await settle(p.rt, p.Panel, props21);
+      ok('点开就是小说库（改名 / 删除都在里面）', treeText(t).indexOf('小说库') >= 0 && byClass(t, 'dn_swrow').length >= 1, treeText(t).slice(0, 50));
+      // 收回原来的根目录，别影响后面的清理
+      click(row);
+      t = await settle(p.rt, p.Panel, props21);
+      process.env.DSH_NOVEL_ROOT = prevRoot;
+      fs.rmSync(SOLO, { recursive: true, force: true });
     }
   }
 } finally {
