@@ -381,13 +381,21 @@ node probe-client-bundle.mjs dsh-novel D:\dsh\plugins\dsh-novel-plugin\lib\clien
    `window.__ModuleLoader__.load({ id, factory:(require)=>{...} })`，
    `require("react")` 由宿主提供，`react.createElement` 手写即可。
 4. **两个 `inject` 不是一回事，v0.12.0 在这里栽过一次：**
-   - `package.json` 的 **`dsh.client.inject`** = **包 id**，管"先加载谁"。
-     ⚠️ **只能写有客户端半（`lib/client.js`）的包**：`@deepseek-ai/dsh-client-ui-slots`
-     是**纯库**（只有 `index.js` + 类型），写进去就永远等不到 → **插件整个不跑**、
-     表现是"面板凭空消失、控制台还没报错"。`slots` 服务真正的提供者是
-     **`@deepseek-ai/dsh-client-ui-renderer`**（ui-slots 的 README 原话：
-     *"ui-renderer 将其用于 `ctx.slots.inject`"*）。
+   - `package.json` 的 **`dsh.client.inject`** = **包 id**，管"加载 / 排序"。
+     ⚠️ **这一条我写错过，2026-09-30 晚更正**：我曾断言"inject 里的包必须有客户端半，
+     否则插件整个不跑"，还把 `@deepseek-ai/dsh-client-ui-slots`（纯库）当反例写在这儿。
+     后来在真机上扫了一圈 —— **已有 7 个正常工作的插件**（better-sidebar / wechat / at-file
+     和家族那几个 UI 插件）同样把纯库写进 inject，它们都好好的；读宿主
+     `dsh-client-modules` 也印证了：唯一会**真的抛错**的路径是 `initialBundleSnapshot()`,
+     即**声明了 `dsh.client` 的包**读不到 bundle 文件时抛 `MissingClientBundleError`
+     （启动审计里会大声报出来）。列一个没有客户端半的包不在这条路径上，最多是"这条依赖
+     永远满足不了" ⇒ 那是 **⚠️ 无害但没意义**，不是 🛑。我的检查器已按这个改。
+     要用 slot 服务，就得让**提供者**（`slots` 来自 `@deepseek-ai/dsh-client-ui-renderer`，
+     ui-slots 的 README 原话：*"ui-renderer 将其用于 `ctx.slots.inject`"*）在加载列表里，
+     而不是 ui-slots 这个纯库。
    - 客户端半里 `exports.inject` = **服务名**（`["slots"]` / `["slots","locale"]`），管"等服务起来"。
+     **v0.12.0 那次事故最可疑的是这一处**（我当时把两处都写成了包 id）——不过两处是一起改的，
+     所以"究竟是哪一处让面板消失"**没有定论**；按契约，服务名这处写错是明确的违规。
    判断依据永远去**读一个已经在跑的同类插件**，别凭字段名猜。
 5. **webServer 不能写进顶层 `export const inject`**，那会拖住整个插件（工具一起等）；
    要动态注入：`ctx.inject(['webServer'], (c) => c.get('webServer').register(route))`。
@@ -475,7 +483,9 @@ node probe-client-bundle.mjs dsh-novel D:\dsh\plugins\dsh-novel-plugin\lib\clien
       declares it leaves the panel simply absent instead of failing boot*）。
     - **list 席位要 `id`、keyed 席位要 `key`，而且 key 要和左侧栏那条的 id 对齐**；
       直接 register 一个没声明的席位会抛 `slot "X" is not declared`。
-    - **"机会主义回退"不能写进 `dsh.client.inject`**：那个字段是硬依赖（等不到就整个客户端半不加载）。
+    - **"机会主义回退"不能写进 `dsh.client.inject`**：那个字段是**加载 / 排序声明** ——
+      写进去就等于告诉宿主"我依赖它"，而回退路要的恰恰是"没它也能跑"（更正：我原来在这里
+      写成"硬依赖，等不到就整个客户端半不加载"，那句跟第 4 条的更正一起作废）。
       想让老三方侧栏当回退，就用 `ctx.get("betterSidebar")` 去试探，别写进 inject。
 23. **升级宿主前，先跑"启动闸门"预检。** 0.2.0 起宿主启动时会读每个 bundle 的
     `peerDependencies`：只要有一个 `@deepseek-ai/dsh*` 的范围不满足当前版本，

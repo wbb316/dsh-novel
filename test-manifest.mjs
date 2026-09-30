@@ -3,8 +3,12 @@
 // 起因（2026-09-30，v0.12.0）：我把两个 inject 都写成了**包 id** ——
 //   · package.json 的 dsh.client.inject 里塞了 `@deepseek-ai/dsh-client-ui-slots`
 //   · 客户端半的 exports.inject 里也塞了包 id
-// 而 ui-slots 是**纯库**（只有 index.js，没有 lib/client.js）：宿主永远等不到这个模块，
-// apply 永不执行 → **面板凭空消失，控制台还不报错**。查了半天才定位。
+// 改完面板就出来了。我当时**推定**元凶是"把纯库写进 inject"—— 这条推定当晚被证伪：
+// 真机上有 **7 个正常工作的插件**同样把纯库写进 inject，它们都好好的；读宿主
+// `dsh-client-modules` 也印证了，唯一会**真的抛错**的路径是 `initialBundleSnapshot()`，
+// 即**声明了 `dsh.client` 的包**读不到 bundle 文件时抛 `MissingClientBundleError`。
+// 所以下面第 2 节只校验"写法像不像包 id"（不再断言"必须有客户端半"）；按契约明确违规的
+// 是第 3 节那处：服务名位置写了包 id。
 //
 // 这个文件把当时靠"读懂宿主源码"才明白的几条规矩钉成断言，下次改 inject 会当场红。
 import fs from 'node:fs'
@@ -29,7 +33,7 @@ ok('exports["./client"] 指向的文件存在', !!clientPath && exists(clientPat
 const patch = pkg.dsh?.bundle?.patch
 ok('dsh.bundle.patch 指向的文件存在', !!patch && exists(patch), String(patch))
 
-console.log('\n── 2. dsh.client.inject = 包 id（且必须是有客户端半的包）──')
+console.log('\n── 2. dsh.client.inject = 包 id（加载 / 排序用；不是"必须有客户端半"）──')
 const pkgInject = pkg.dsh?.client?.inject ?? []
 ok('platform = web', pkg.dsh?.client?.platform === 'web', String(pkg.dsh?.client?.platform))
 ok('inject 不是空的', pkgInject.length > 0, JSON.stringify(pkgInject))
@@ -75,7 +79,7 @@ console.log('\n── 5. 面板注册的两条路都还在（别被谁顺手删�
 ok('原生席位：sidebar.panellist', clientSrc.includes('sidebar.panellist'))
 ok('原生席位：main', clientSrc.includes('"main"'))
 ok('机会主义回退：betterSidebar', clientSrc.includes('betterSidebar'))
-ok('回退没写进 inject（否则那个插件卸了客户端半就不加载）', !pkgInject.includes('dsh-better-sidebar') && !svcInject.includes('betterSidebar'))
+ok('回退没写进 inject（inject 是加载/排序声明，回退要的是"没它也能跑"）', !pkgInject.includes('dsh-better-sidebar') && !svcInject.includes('betterSidebar'))
 
 console.log(`\n共 ${total} 项断言`)
 if (bad) {
