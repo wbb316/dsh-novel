@@ -10,7 +10,7 @@
  *
  * 全程跑在临时小说根目录里，跑完删掉 —— 绝不碰你真实的小说。
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-rename.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-rename.mjs
  */
 import fs from 'node:fs'
 import os from 'node:os'

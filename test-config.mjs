@@ -6,7 +6,7 @@
  *   - `DSH_NOVEL_ROOT` 先清掉（不然环境变量优先，就没法测"面板改路径"这条路）
  *   - 所有目录都建在系统临时目录里，跑完删干净
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-config.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-config.mjs
  */
 import fs from 'node:fs'
 import os from 'node:os'

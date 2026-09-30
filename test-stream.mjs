@@ -1,7 +1,7 @@
 /**
  * 本地验证「流式缓冲」——纯逻辑，喂假帧就行（不启 DSH、不占端口）。
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-stream.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-stream.mjs
  */
 import { createStreamBuffer, STREAM_TEXT_CAP, extractJsonStringField, pickPreview } from './lib/stream.js'
 

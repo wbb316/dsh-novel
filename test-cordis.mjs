@@ -9,7 +9,7 @@
  *
  * 不启动 web server、不占端口。
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-cordis.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-cordis.mjs
  */
 import { Context } from '@deepseek-ai/cordis'
 import * as novel from './lib/index.js'

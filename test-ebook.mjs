@@ -1,7 +1,7 @@
 /**
  * 本地验证「EPUB / DOCX 导出」——不启 DSH、不占端口、不调用外部解压工具。
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-ebook.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-ebook.mjs
  *
  * 测什么：
  *   1) crc32 对不对（标准测试向量 0xCBF43926 + 一个独立的逐位实现互相印证）

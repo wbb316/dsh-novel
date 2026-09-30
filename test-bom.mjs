@@ -18,7 +18,7 @@
  *
  * 全程跑在一个临时小说根目录里（DSH_NOVEL_ROOT / DSH_NOVEL_CONFIG 指过去），跑完删掉。
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-bom.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-bom.mjs
  */
 import fs from 'node:fs'
 import os from 'node:os'

@@ -2,13 +2,13 @@
 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
-[![DSH](https://img.shields.io/badge/DSH-0.1.5%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
-[![sidebar](https://img.shields.io/badge/needs-dsh--better--sidebar-7e57c2.svg)](https://github.com/omdsh-dev/DSH-better-sidebar)
-[![tests](https://img.shields.io/badge/tests-1255%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
+[![DSH](https://img.shields.io/badge/DSH-0.2.0--rc.1%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
+[![seats](https://img.shields.io/badge/panel-native%20seats-7e57c2.svg)](#-原生席位小说面板)
+[![tests](https://img.shields.io/badge/tests-1263%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
 [![release](https://img.shields.io/github/v/release/wbb316/dsh-novel?label=release&color=success)](https://github.com/wbb316/dsh-novel/releases)
 
 DSH 插件：**小说创作台**。管你的小说项目（大纲 / 世界观 / 角色 & 关系 / 章节），
-一半给 agent 用（`novel_*` 工具），一半给人用（右侧栏「小说」面板）。
+一半给 agent 用（`novel_*` 工具），一半给人用（宿主原生席位「小说」面板）。
 
 它解决的是**写长篇时的实际麻烦**：设定和人物关系要随手能改、换个小说回来还记得读到哪、
 点一下就让 AI 带着大纲和角色关系接着写、边写边看它流出来的字。
@@ -34,16 +34,16 @@ dsh web
 
 | | 说明 |
 |---|---|
-| DSH | `0.1.5` 或更高（用到了 `agent/assistant-stream` 流式帧） |
+| DSH | **`0.2.0-rc.1` 或更高**（面板挂在宿主原生席位上）；老宿主仍可用，面板会退回 dsh-better-sidebar 页签 |
 | Node | `>= 20` |
-| [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | 侧栏面板的容器；**不装的话工具照常可用，只是没有面板** |
+| [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | **可选**——只有「宿主没有原生席位」的老版本才需要它 |
 
 <details>
 <summary>本地开发（改完立刻生效）</summary>
 
 ```powershell
-git clone https://github.com/wbb316/dsh-novel.git D:\dsh-novel-plugin
-dsh plugin --profile web add link:D:/dsh-novel-plugin
+git clone https://github.com/wbb316/dsh-novel.git D:\dsh\plugins\dsh-novel-plugin
+dsh plugin --profile web add link:D:/dsh/plugins/dsh-novel-plugin
 ```
 `link:` 装的是软链，**源码改了就是改了**：客户端半（`lib/client.js`）刷新浏览器即可，宿主半（`lib/index.js` 等）要重启 `dsh web`。
 
@@ -132,14 +132,14 @@ D:\dsh-novel\我的第一本小说\
 设了环境变量就以它为准（面板会明确告诉你改不动、以及为什么）。
 
 ```
-D:\dsh-novel-plugin\
+D:\dsh\plugins\dsh-novel-plugin\
 ├── package.json              双面声明：宿主半（main / dsh.bundle）+ 客户端半（exports["./client"] / dsh.client）
 ├── cordis.patch.yml          把插件插进 DSH 的插件树
 ├── lib\
 │   ├── index.js              宿主半：5 个 agent 工具 + 8 条浏览器 API（零 import）
 │   ├── cast.js               角色/关系纯函数层：校验、增删改、渲染纯文本人物卡
 │   ├── stream.js             流式缓冲：把模型增量帧折成"正在写的字" + 半截 JSON 抠字段
-│   └── client.js             客户端半：右侧栏「小说」面板（手写 createElement + SVG，无构建）
+│   └── client.js             客户端半：「小说」面板（手写 createElement + SVG，无构建）
 ├── test-cast.mjs             角色/关系纯函数
 ├── test-stream.mjs           流式缓冲纯逻辑
 ├── test-config.mjs           保存位置（临时配置文件 + 临时目录，绝不碰真实配置）
@@ -162,7 +162,7 @@ D:\dsh-novel-plugin\
 
 ```
 C:\Users\<你>\.dsh\profiles\<profile>\package.json
-  dependencies        : "dsh-novel": "github:wbb316/dsh-novel"   ← 或者 link:D:/dsh-novel-plugin
+  dependencies        : "dsh-novel": "github:wbb316/dsh-novel"   ← 或者 link:D:/dsh/plugins/dsh-novel-plugin
   dsh.profile.bundles : 末尾加 "dsh-novel"
 ```
 
@@ -219,10 +219,33 @@ C:\Users\<你>\.dsh\profiles\<profile>\package.json
 
 写路径都带目录穿越校验；`characters.md` / `characters.json` 不给直接写（生成物 / 请走角色页）。
 
-## 🪟 右侧栏「小说」面板
+## 🪟 原生席位「小说」面板
 
-借 `dsh-better-sidebar` 的 `ctx.betterSidebar.registerTab({id,title,order,single,component})` 注册：
+面板挂在**宿主自带的席位系统**上，不依赖任何第三方插件（0.12.0 起）：
 
+```js
+// 左侧栏那一行：list 席位，要 id
+ctx.slots.inject("sidebar.panellist", () => ctx.slots.register(
+  { name: "sidebar.panellist", id: "dsh-novel", order: 60, label: () => "小说" }, NovelPanelIcon))
+// 主区页面：keyed 席位，key 要和上面的 id 对齐
+ctx.slots.inject("main", () => ctx.slots.register(
+  { name: "main", key: "dsh-novel" }, NovelPanelPage))
+```
+
+几个刻意的选择：
+
+- **用 `ctx.slots.inject` 而不是直接 register**：`inject` 只在「席位真被声明」后才回调。
+  宿主没有这个席位（比如老版本）→ 面板只是不出现，**绝不会把插件的加载搞崩**。
+- **图标必须带 `data-dsh-panel-entry="dsh-novel"`**：那是宿主认的身份锚点，皮肤靠它定位这一行。
+- **老宿主有回退**：没有 `ctx.slots` 时退回 `dsh-better-sidebar` 的右侧栏页签。
+  但那个回退是**机会主义**的 —— `betterSidebar` **没有**写进 `dsh.client.inject`，
+  所以那个插件卸了、没装，都不影响本插件加载。
+- 面板页用 `NovelPanelPage` 包一层 `.dn_page`（撑满主区）再渲染 `NovelPanel` 本体。
+- **两边 inject 写的不是同一种东西**：`package.json` → `dsh.client.inject` 写**包 id**
+  （`@deepseek-ai/dsh-client-ui-renderer` / `-layout` / `-conversation`）；
+  客户端半里 `exports.inject` 写**服务名**（`["slots"]`）。详见踩坑第 4 条。
+
+功能（无论走哪条路都一样）：
 - **✍️ 写下一章**：点一下就把续写请求**直接发进当前会话**（不用回去打字）：
   - 输入框是空的 → 替你填好并发送（`setDraft` + `submit('queue')`，agent 正忙就排队、不打断）
   - 输入框里已经有你打的字 → **只追加、绝不覆盖**，并提醒你按 Enter
@@ -270,7 +293,7 @@ C:\Users\<你>\.dsh\profiles\<profile>\package.json
 ## 🧪 开发和自测（**不启动 DSH、不占端口**）
 
 ```powershell
-cd D:\dsh-novel-plugin
+cd D:\dsh\plugins\dsh-novel-plugin
 node test-cast.mjs        # 角色/关系纯函数：脏数据、指错人、渲染纯文本人物卡
 node test-bom.mjs         # BOM 守卫：仓库里不许有 BOM + 用户文件带 BOM 也要能读
 node test-stream.mjs      # 流式缓冲：帧折叠、半截 JSON 抠字符串、preview 降级
@@ -286,7 +309,7 @@ node test-ebook.mjs       # EPUB / DOCX：自写 readZip 往返比对 + w:t 必�
 node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 桩打到真路由
 ```
 
-目前 **1255 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
+目前 **1263 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
 
 | 测试 | 在哪跑 | 会留下什么 |
 |---|---|---|
@@ -314,7 +337,7 @@ node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 
 只想看看某个插件的客户端 bundle 有没有被服务端认出来：
 
 ```powershell
-node probe-client-bundle.mjs dsh-novel D:\dsh-novel-plugin\lib\client.js
+node probe-client-bundle.mjs dsh-novel D:\dsh\plugins\dsh-novel-plugin\lib\client.js
 # rev 是文件字节的 sha1 前 12 位，200 = 服务端手里就是这份
 ```
 
@@ -332,8 +355,15 @@ node probe-client-bundle.mjs dsh-novel D:\dsh-novel-plugin\lib\client.js
 3. **客户端半不用打包、不用 JSX。** 交付格式就是
    `window.__ModuleLoader__.load({ id, factory:(require)=>{...} })`，
    `require("react")` 由宿主提供，`react.createElement` 手写即可。
-4. **`dsh.client.inject`（客户端包 id，管加载顺序）** 和客户端 **`exports.inject`（服务名）**
-   不是一回事，别混。
+4. **两个 `inject` 不是一回事，v0.12.0 在这里栽过一次：**
+   - `package.json` 的 **`dsh.client.inject`** = **包 id**，管"先加载谁"。
+     ⚠️ **只能写有客户端半（`lib/client.js`）的包**：`@deepseek-ai/dsh-client-ui-slots`
+     是**纯库**（只有 `index.js` + 类型），写进去就永远等不到 → **插件整个不跑**、
+     表现是"面板凭空消失、控制台还没报错"。`slots` 服务真正的提供者是
+     **`@deepseek-ai/dsh-client-ui-renderer`**（ui-slots 的 README 原话：
+     *"ui-renderer 将其用于 `ctx.slots.inject`"*）。
+   - 客户端半里 `exports.inject` = **服务名**（`["slots"]` / `["slots","locale"]`），管"等服务起来"。
+   判断依据永远去**读一个已经在跑的同类插件**，别凭字段名猜。
 5. **webServer 不能写进顶层 `export const inject`**，那会拖住整个插件（工具一起等）；
    要动态注入：`ctx.inject(['webServer'], (c) => c.get('webServer').register(route))`。
 6. **一个路径只能注册一条路由**（`registerApi` 里我加了防重复的自我保护）。
@@ -410,6 +440,23 @@ node probe-client-bundle.mjs dsh-novel D:\dsh-novel-plugin\lib\client.js
     对你有什么影响、你怎么自己验"三件事说话；
     "我踩了什么坑、我测试怎么写的"留给**踩坑清单**（那里本来就是日记体，反而合适）。
     另外：**先想清楚这段文字是给谁看的**，再动笔。
+22. **面板别挂在第三方插件上 —— 0.2.0 起宿主自己就有席位系统。** 老写法是借
+    `ctx.betterSidebar.registerTab()` 往右侧栏塞页签，代价是：那个插件一卸，面板就没了；
+    它的 peer 范围一变，连宿主升级都会被它拦住（这次升级真的被拦过一次）。
+    新写法是宿主的 `ctx.slots`：`inject("sidebar.panellist")` 拿左侧栏那一行、
+    `inject("main")` 拿主区页面。三条经验：
+    - **用 `slots.inject` 而不是直接 `register`**：inject 的回调只在席位被声明后才跑，
+      宿主没这个席位就只是面板不出现，**不会让插件加载失败**（注释里原话：*a shell that never
+      declares it leaves the panel simply absent instead of failing boot*）。
+    - **list 席位要 `id`、keyed 席位要 `key`，而且 key 要和左侧栏那条的 id 对齐**；
+      直接 register 一个没声明的席位会抛 `slot "X" is not declared`。
+    - **"机会主义回退"不能写进 `dsh.client.inject`**：那个字段是硬依赖（等不到就整个客户端半不加载）。
+      想让老三方侧栏当回退，就用 `ctx.get("betterSidebar")` 去试探，别写进 inject。
+23. **升级宿主前，先跑"启动闸门"预检。** 0.2.0 起宿主启动时会读每个 bundle 的
+    `peerDependencies`：只要有一个 `@deepseek-ai/dsh*` 的范围不满足当前版本，
+    `loadProfileDirectory` 就 **throw，Web 服务根本没机会监听**（症状又是"网页打不开"，
+    和当年那个 BOM 事故一模一样的体感）。所以本插件现在**主动声明**了 peer 范围 +
+    `dsh.engines.dsh`：与其"靠兼容性侥幸活着"，不如让宿主在装错版本时**明确拦住**。
 
 ---
 
@@ -443,5 +490,7 @@ DOCX 双击用 Word 或 WPS 打开 —— 能翻页、标题有层级、没有 `
 
 - 多设备同步（小说库记忆现在存在浏览器本地，手机上打开是另一套）
 
-> v0.11.0 把前面四项做完了：卷 / 章、关系图自动布局（力导向）、图片头像、EPUB / Word 导出。
+> v0.12.0 把面板从**第三方侧栏**迁到了**宿主原生席位**（左侧栏一行 + 主区页面，不再依赖
+> dsh-better-sidebar），并主动声明了 peer 范围 + `dsh.engines.dsh`，让宿主能在版本不匹配时拦住。
+> 更早的 v0.11.0 做完：卷 / 章、关系图自动布局（力导向）、图片头像、EPUB / Word 导出。
 > 见 [Releases](https://github.com/wbb316/dsh-novel/releases)。

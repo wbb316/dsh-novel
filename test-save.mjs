@@ -8,7 +8,7 @@
  *   + **老格式兼容**（outline.md 那套照样读、而且改写回原文件）
  *   + 角色增删改 / 关系 / 章节改名删除 / 危险写操作拦截
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-save.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-save.mjs
  */
 import fs from 'node:fs'
 import path from 'node:path'

@@ -10,7 +10,7 @@
  *   4) 整场跑在一个**临时小说根目录**里（DSH_NOVEL_ROOT 指过去），跑完删掉
  *      → 绝不碰你真实的小说
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-client.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-client.mjs
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -363,10 +363,14 @@ try {
   console.log('── 1. 模块形状 ──')
   ok('模块 id = dsh-novel', loaded && loaded.id === 'dsh-novel', String(loaded && loaded.id))
   const m = loaded.factory(fakeRequire)
-  ok('inject = ["betterSidebar"]', JSON.stringify(m.inject) === '["betterSidebar"]', JSON.stringify(m.inject))
+  ok(
+    'inject = 客户端服务名（slots，由 ui-renderer 提供）',
+    JSON.stringify(m.inject) === '["slots"]',
+    JSON.stringify(m.inject)
+  )
   ok('apply 是函数', typeof m.apply === 'function')
 
-  console.log('\n── 2. 注册页签 ──')
+  console.log('\n── 2. 老宿主回退：betterSidebar 页签（没有 ctx.slots 时）──')
   let tab = null
   m.apply({
     betterSidebar: {
@@ -380,6 +384,69 @@ try {
   ok('id = dsh-novel:panel', tab && tab.id === 'dsh-novel:panel')
   ok('title = 小说', tab && tab.title === '小说')
   ok('component 是函数', tab && typeof tab.component === 'function')
+
+  console.log('\n── 2b. 0.2.0 原生席位（主路）：左侧栏一行 + 主区页面 ──')
+  {
+    const pending = []
+    const regs = []
+    let sidebarCalls = 0
+    const rtn = createReact()
+    const mxn = loaded.factory((n) => {
+      if (n === 'react') return rtn.React
+      throw new Error('意外的 require: ' + n)
+    })
+    mxn.apply({
+      slots: {
+        inject: (name, cb) => {
+          pending.push({ name, cb })
+          return () => {}
+        },
+        register: (opts, Comp) => {
+          regs.push({ opts, Comp })
+          return () => {}
+        }
+      },
+      betterSidebar: {
+        registerTab: () => {
+          sidebarCalls += 1
+          return () => {}
+        }
+      },
+      effect: (fn) => fn()
+    })
+    ok(
+      'inject 了两个原生席位（panellist → main）',
+      JSON.stringify(pending.map((p) => p.name)) === '["sidebar.panellist","main"]',
+      JSON.stringify(pending.map((p) => p.name))
+    )
+    ok('席位没被声明之前不注册（inject 的语义）', regs.length === 0, String(regs.length))
+    for (const p of pending) p.cb()
+    ok('席位声明后各注册一条', regs.length === 2, String(regs.length))
+
+    const listEntry = regs.find((r) => r.opts.name === 'sidebar.panellist')
+    const mainEntry = regs.find((r) => r.opts.name === 'main')
+    ok(
+      '左侧栏条目：id=dsh-novel / order=60 / label=小说',
+      !!listEntry && listEntry.opts.id === 'dsh-novel' && listEntry.opts.order === 60 && listEntry.opts.label() === '小说',
+      JSON.stringify(listEntry && listEntry.opts)
+    )
+    ok(
+      '主区页面：key 与左侧栏 id 对齐（keyed 席位的要求）',
+      !!mainEntry && mainEntry.opts.key === 'dsh-novel',
+      JSON.stringify(mainEntry && mainEntry.opts)
+    )
+    const icon = listEntry && listEntry.Comp({ size: 16 })
+    ok(
+      '图标带 data-dsh-panel-entry 身份锚点（皮肤靠它定位）',
+      !!icon && icon.props['data-dsh-panel-entry'] === 'dsh-novel',
+      icon ? String(icon.props['data-dsh-panel-entry']) : '(没有)'
+    )
+    ok('有原生席位时不再注册 betterSidebar 页签（不重复挂）', sidebarCalls === 0, String(sidebarCalls))
+    if (mainEntry) {
+      const pageTree = await settle(rtn, mainEntry.Comp, {})
+      ok('主区页面能真渲染出面板（标题栏在）', byClass(pageTree, 'dn_head').length >= 1, String(byClass(pageTree, 'dn_head').length))
+    }
+  }
 
   const props = { visible: true }
   const Panel = tab.component

@@ -7,7 +7,7 @@
  * 注意：这个文件**只测读路径和错误路径**，不写任何文件；
  *      成功写盘全部在 test-save.mjs 的临时小说里跑。
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-api.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-api.mjs
  */
 import fs from 'node:fs'
 import path from 'node:path'

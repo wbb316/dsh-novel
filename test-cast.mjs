@@ -1,7 +1,7 @@
 /**
  * 本地验证「角色/关系」纯函数层（lib/cast.js）—— 不碰磁盘、不启 DSH。
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-cast.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-cast.mjs
  */
 import {
   emptyCast,

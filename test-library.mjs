@@ -5,7 +5,7 @@
  * 因为客户端半不能 import 自己的文件，所以只能这样给测试开后门。
  * 这里喂假 localStorage，不碰浏览器、不碰 DSH、不占端口。
  *
- * 跑法：  cd D:\dsh-novel-plugin ; node test-library.mjs
+ * 跑法：  cd D:\dsh\plugins\dsh-novel-plugin ; node test-library.mjs
  */
 import fs from 'node:fs'
 
