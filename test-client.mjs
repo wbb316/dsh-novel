@@ -131,7 +131,15 @@ function createReact() {
 
   const React = {
     createElement(type, props, ...kids) {
-      return { type, props: props || {}, kids: kids.flat(Infinity) }
+      const flat = kids.flat(Infinity)
+      const p = props || {}
+      // 真 React 的语义：children **既**在参数里，也放进 props.children
+      // （少这一条，组件里写 props.children 的代码在测试里会凭空消失 —— 生产环境却是好的，
+      //   这种"测试比实现更严"的假红最坑人，所以桩要跟 React 对齐）
+      if (p.children === undefined && flat.length) {
+        p.children = flat.length === 1 ? flat[0] : flat
+      }
+      return { type, props: p, kids: flat }
     },
     useState(init) {
       // 关键：把 store 捕获进闭包。副作用里调 set 时 cur 已经被还原了
@@ -484,6 +492,52 @@ try {
     ok('保存后又变回禁用', !!btn(tree, '已保存') && btn(tree, '已保存').props.disabled === true)
   }
 
+  console.log('\n── 4b. 设定页：设定.json 的结构化表单 ──')
+  {
+    // ⚠️ 视图页签（章节/剧情/设定/角色）和文件页签（大纲/世界观/…）**共用 dn_tab 这个 class**，
+    //    所以必须取**最后一个**「设定」才是设定.json 那个文件页签
+    const setTab = byClass(tree, 'dn_tab').filter((n) => textOf(n) === '设定').pop()
+    ok('文件页签里有「设定」', !!setTab)
+    click(setTab)
+    tree = await settle(rt, Panel, props)
+    ok('显示的是表单而不是一坨 JSON', !!fieldBox(tree, '类型 / 题材') && byType(tree, 'textarea').length === 0)
+    ok(
+      '字段齐（跟开书向导同一套）',
+      ['类型 / 题材', '基调', '视角', '每章目标字数', '主线一句话', '结局 / 终点', '标签（逗号分隔）'].every(
+        (l) => !!fieldBox(tree, l)
+      )
+    )
+    ok('老项目还没这个文件 → 给的是空默认值', fieldBox(tree, '类型 / 题材').props.value === '')
+    ok('没改之前保存禁用', !!btn(tree, '已保存') && btn(tree, '已保存').props.disabled === true)
+
+    setValue(fieldBox(tree, '类型 / 题材'), '校园恋爱')
+    setValue(fieldBox(tree, '每章目标字数'), '3000')
+    setValue(fieldBox(tree, '标签（逗号分隔）'), '校园, 练习')
+    tree = await settle(rt, Panel, props)
+    ok('改了之后可保存', !!btn(tree, '保存 (Ctrl+S)') && btn(tree, '保存 (Ctrl+S)').props.disabled === false)
+    click(btn(tree, '保存 (Ctrl+S)'))
+    tree = await settle(rt, Panel, props)
+    ok('磁盘上真建出了 设定.json', fs.existsSync(path.join(ROOT, NOVEL_A, '设定.json')))
+    const st = JSON.parse(fs.readFileSync(path.join(ROOT, NOVEL_A, '设定.json'), 'utf8'))
+    ok('类型存对了', st.genre === '校园恋爱')
+    ok('每章字数转成了数字', st.chapterChars === 3000, String(st.chapterChars))
+    ok('标签拆成了数组', JSON.stringify(st.tags) === '["校园","练习"]', JSON.stringify(st.tags))
+    ok('保存后又变回禁用', !!btn(tree, '已保存') && btn(tree, '已保存').props.disabled === true)
+    // ⚠️ 最阴的坑：给**老项目**存了 设定.json 之后，不许把它判成"新格式"（否则会去读不存在的 大纲.txt）
+    ok(
+      '老项目仍是老格式（outline.md 还在、没冒出 大纲.txt）',
+      fs.existsSync(path.join(ROOT, NOVEL_A, 'outline.md')) && !fs.existsSync(path.join(ROOT, NOVEL_A, '大纲.txt'))
+    )
+
+    click(btn(tree, '直接改 JSON'))
+    tree = await settle(rt, Panel, props)
+    const rawTa = byType(tree, 'textarea')[0]
+    ok('能切到原始 JSON 看', !!rawTa && String(rawTa.props.value).indexOf('校园恋爱') >= 0)
+    click(btn(tree, '↩ 用表单改'))
+    tree = await settle(rt, Panel, props)
+    ok('能切回表单', !!fieldBox(tree, '类型 / 题材'))
+  }
+
   console.log('\n── 5. 人物卡在设定页是只读的 ──')
   {
     click(findAll(tree, (n) => n.type === 'button' && textOf(n).indexOf('人物卡') >= 0)[0])
@@ -577,23 +631,124 @@ try {
     ok('新 characters.md 是生成的', fs.readFileSync(path.join(ROOT, NOVEL_B, 'characters.md'), 'utf8').indexOf('自动生成') >= 0)
   }
 
-  console.log('\n── 9. 新建小说 ──')
+  console.log('\n── 9. 开书向导（单独一页）──')
   {
+    // ⚠️ 整节只用**一套 props**：向导的草稿是 NovelPanel 的 state，
+    //    而迷你 React 的槽位 key 是「位置 + 类型名」——
+    //    中途换 props 会让我在另一份实例上建状态（生产里 React 不会这样，纯测试写法坑）
+    const wzCalls = []
+    const wzInput = {
+      state: { getSnapshot: () => ({ draft: '' }) },
+      setDraft: (v) => wzCalls.push(v),
+      submit: () => {}
+    }
+    const props9 = {
+      visible: true,
+      ctx: {
+        get: (n) => (n === 'conversation' ? { input: { for: () => wzInput } } : undefined),
+        sessions: { scope: () => 'S' }
+      },
+      scope: { sessionId: 's1' }
+    }
+    tree = await settle(rt, Panel, props9)
     click(btn(tree, '＋ 新建'))
-    tree = await settle(rt, Panel, props)
-    ok('出现新建表单', !!fieldBox(tree, '书名'))
+    tree = await settle(rt, Panel, props9)
+    ok('整页接管：出现「开书向导」标题', treeText(tree).indexOf('开书向导') >= 0)
+    ok(
+      '五个折叠区都在',
+      ['基本', '主角', '世界观', '大纲', '进阶'].every((t) => treeText(tree).indexOf(t) >= 0)
+    )
+    ok('顶部有「← 返回」', !!btn(tree, '← 返回'))
+    ok('底部有「创建这本书」', !!btn(tree, '创建这本书'))
+    ok('四套模板都在', ['空白', '校园恋爱', '都市异能', '悬疑推理'].every((t) => !!btn(tree, t)))
+    ok('默认展开了主角区', !!fieldBox(tree, '姓名'))
+    ok('世界观区默认折叠（看不到它的字段）', !fieldBox(tree, '一条禁忌'))
+
+    // 模板**只补空位**：先自己写一句简介，再套模板
     setValue(fieldBox(tree, '书名'), NEW)
-    setValue(fieldBox(tree, '一句话简介（可以先空着）'), '一个用来测试的新故事')
-    tree = await settle(rt, Panel, props)
-    click(btn(tree, '创建'))
-    tree = await settle(rt, Panel, props)
+    setValue(fieldBox(tree, '一句话简介'), '我自己写的一句话')
+    tree = await settle(rt, Panel, props9)
+    click(btn(tree, '校园恋爱'))
+    tree = await settle(rt, Panel, props9)
+    ok('模板没覆盖我写的简介', fieldBox(tree, '一句话简介').props.value === '我自己写的一句话')
+    ok('模板补了空着的类型', fieldBox(tree, '类型 / 题材').props.value === '校园恋爱')
+    ok('界面说明"只补了空着的字段"', treeText(tree).indexOf('只补了空着的字段') >= 0)
+
+    // 主角区（默认展开）填三样
+    setValue(fieldBox(tree, '姓名'), '苏晚')
+    setValue(fieldBox(tree, '身份（学校 · 社团 · 职业）'), '高三 · 文学社')
+    setValue(fieldBox(tree, '他想要什么'), '学会喜欢一个人而不逃跑')
+    tree = await settle(rt, Panel, props9)
+
+    // 展开「世界观」「大纲」两区，各填一条
+    click(byClass(tree, 'dn_wz_h').find((n) => treeText(n).indexOf('世界观') >= 0))
+    click(byClass(tree, 'dn_wz_h').find((n) => treeText(n).indexOf('大纲') >= 0))
+    tree = await settle(rt, Panel, props9)
+    ok('展开后能看到世界观字段', !!fieldBox(tree, '一条禁忌'))
+    setValue(fieldBox(tree, '一条禁忌'), '不许在文学社提「恋爱」两个字')
+    setValue(fieldBox(tree, '第一幕'), '契约成立，两人开始练习')
+    tree = await settle(rt, Panel, props9)
+
+    // 「✨ 让 AI 帮我补全」：把这张表塞进对话输入框（复用「写下一章」那条路）
+    click(btn(tree, '✨ 让 AI 帮我补全'))
+    tree = await settle(rt, Panel, props9)
+    ok('把表发进了输入框', wzCalls.length === 1 && String(wzCalls[0]).indexOf('苏晚') >= 0, String(wzCalls[0] || '').slice(0, 36))
+    ok(
+      '扩写请求带书名 + 明确的工具要求',
+      String(wzCalls[0]).indexOf(NEW) >= 0 && String(wzCalls[0]).indexOf('novel_cast') >= 0
+    )
+    ok('界面提示已发进输入框', treeText(tree).indexOf('已把这张表发进输入框') >= 0)
+
+    // 创建
+    click(btn(tree, '创建这本书'))
+    tree = await settle(rt, Panel, props9)
     ok('磁盘上建好目录', fs.existsSync(path.join(ROOT, NEW)))
     ok(
-      '四份文件都在',
+      '四份基础文件都在',
       ['大纲.txt', '世界观.txt', '人物卡.txt', '角色.json'].every((f) => fs.existsSync(path.join(ROOT, NEW, f)))
     )
-    ok('简介写进大纲', fs.readFileSync(path.join(ROOT, NEW, '大纲.txt'), 'utf8').indexOf('一个用来测试的新故事') >= 0)
+    const readJsonIf = (rel) => {
+      const p = path.join(ROOT, NEW, rel)
+      if (!fs.existsSync(p)) return null
+      try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'))
+      } catch {
+        return null
+      }
+    }
+    const wzSettings = readJsonIf('设定.json')
+    ok('向导填了类型 → 设定.json 也落盘了', !!wzSettings)
+    ok('设定里是模板给的类型', !!wzSettings && wzSettings.genre === '校园恋爱', wzSettings ? wzSettings.genre : '')
+    const outlineNow = fs.existsSync(path.join(ROOT, NEW, '大纲.txt'))
+      ? fs.readFileSync(path.join(ROOT, NEW, '大纲.txt'), 'utf8')
+      : ''
+    ok('简介写进大纲', outlineNow.indexOf('我自己写的一句话') >= 0)
+    const wzCast = readJsonIf('角色.json') || { characters: [] }
+    const wzHero = wzCast.characters.find((c) => c.name === '苏晚')
+    ok('主角进了角色表且 tier=重要', !!wzHero && wzHero.tier === '重要')
+    ok(
+      '"他想要什么"拼进了 desc',
+      !!wzHero && wzHero.desc.indexOf('想要：') >= 0,
+      wzHero ? wzHero.desc.replace(/\n/g, ' | ').slice(0, 40) : ''
+    )
+    const worldNow = fs.existsSync(path.join(ROOT, NEW, '世界观.txt'))
+      ? fs.readFileSync(path.join(ROOT, NEW, '世界观.txt'), 'utf8')
+      : ''
+    ok('世界观里有那条禁忌', worldNow.indexOf('不许在文学社提') >= 0)
+    const wzPlot = readJsonIf('剧情.json')
+    ok('第一幕进了剧情表的全书纲领', !!wzPlot && String((wzPlot.arcs || {})[''] || '').indexOf('契约成立') >= 0)
+    ok('默认顺手建了第一章空稿', fs.existsSync(path.join(ROOT, NEW, 'chapters', '第001章-未命名.txt')))
     ok('创建后自动跳到设定页', byType(tree, 'textarea').length > 0)
+
+    // 换回"没有 ctx"的 props（第 10 节起用；顺便验证「＋ 新建」能再开一次）
+    tree = await settle(rt, Panel, props)
+    click(btn(tree, '＋ 新建'))
+    tree = await settle(rt, Panel, props)
+    ok('能再开一次向导，且草稿是空的（不会残留上一本）', fieldBox(tree, '书名').props.value === '')
+    click(btn(tree, '← 返回'))
+    tree = await settle(rt, Panel, props)
+    ok('「← 返回」能退出向导', treeText(tree).indexOf('开书向导') < 0 && !!btn(tree, '＋ 新建'))
+
     // 打开切换器看看现在有几部（选完它会自己关掉，所以先看再关）
     click(byClass(tree, 'dn_bookrow').find((n) => hasClass(n, 'pick')))
     tree = await settle(rt, Panel, props)

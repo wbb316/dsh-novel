@@ -4,7 +4,7 @@
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![DSH](https://img.shields.io/badge/DSH-0.2.0--rc.1%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
 [![seats](https://img.shields.io/badge/panel-native%20seats-7e57c2.svg)](#-原生席位小说面板)
-[![tests](https://img.shields.io/badge/tests-1281%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
+[![tests](https://img.shields.io/badge/tests-1367%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
 [![release](https://img.shields.io/github/v/release/wbb316/dsh-novel?label=release&color=success)](https://github.com/wbb316/dsh-novel/releases)
 
 DSH 插件：**小说创作台**。管你的小说项目（大纲 / 世界观 / 角色 & 关系 / 章节），
@@ -56,6 +56,17 @@ dsh plugin --profile web add link:D:/dsh/plugins/dsh-novel-plugin
 **🎬 一键续写 + 流式直播**：点「✍️ 写下一章」就把请求发进会话；模型正在写的字实时显示在面板里
 （章节正文是当工具参数流出来的，所以从半截 JSON 里把 `content` 抠出来显示），写完自动刷出新章节。
 
+**📝 开书向导（单独一页）**：点「＋ 新建」不是弹个小框、也不挤在列表下面，而是**整页切换**成向导 ——
+基本 / 主角 / 世界观 / 大纲 / 进阶 五个折叠区，一页滚动，**任何字段都能留空**（先开书、再慢慢补）。
+4 套模板（校园恋爱 / 都市异能 / 悬疑 / 空白）点一下**只补空着的字段**，绝不覆盖你已经写的；
+点「创建这本书」一次性落盘：`设定.json` + 角色表（主角进"重要"档，外貌/想要/弱点/秘密拼进 `desc`）
++ `世界观.txt`（舞台/规则/禁忌/名词表）+ `大纲.txt`（三幕 + 灵感池）+ 剧情表的全书纲领
+（可选顺手建一个空的第一章）。填了一半不想填了，点「✨ 让 AI 帮我补全」把这张表丢进对话，
+缺的我替你定 —— 走的就是「写下一章」那条"写进输入框"的路。
+
+**⚙️ 设定页能改 `设定.json`**：类型 / 基调 / 视角 / 每章目标字数 / 主线 / 结局 / 标签 / 备注
+用**表单**改（跟向导同一套字段），想手改原文点「直接改 JSON」切过去；多写的键保存时会被丢掉。
+
 **📚 小说库**：记住「你正在写哪本」+「每本读到哪一章」；书名那行点开就是列表（搜索 / 排序 / 进度 / 上次看到）；
 可以就地改名、删除（**删除 = 移到回收站**，不是真删）。
 
@@ -102,6 +113,7 @@ EPUB/DOCX 是**自己写的 ZIP 打包器**（只用 Node 内置 `zlib`，零依
 D:\dsh-novel\我的第一本小说\
 ├── 大纲.txt          人写、AI 读（随手写的散文/灵感）
 ├── 世界观.txt        人写、AI 读
+├── 设定.json         数据源：类型 / 基调 / 视角 / 每章目标字数 / 主线 / 结局（面板「设定」页在改它）
 ├── 人物卡.txt        自动生成，给人/AI 看的镜像（别手改）
 ├── 角色.json         数据源：角色（分重要/不重要）+ 关系（面板「角色」页在改它）
 ├── 剧情.json         数据源：情节点 + 挂的章节 + 手勾状态 + 卷纲领（面板「剧情」页在改它）
@@ -110,6 +122,10 @@ D:\dsh-novel\我的第一本小说\
     ├── 第001章-开场.txt
     └── 第002章-第一次见面.txt
 ```
+
+**为什么元信息也要 json**：类型 / 基调 / 视角 / 每章目标字数 / 主线 / 结局这几样是**机器要读**的
+（写下一章时得知道"这本书是什么调子、一章大概多长"）。塞进 `大纲.txt` 那种散文里，agent 只能靠猜；
+而把大纲改成结构化又违背"大纲就是你随手写散文的地方"。所以：**json 归 json，txt 一概不碰**。
 
 **为什么角色关系不也用 txt**：只有结构化了，面板才能给你下拉选人、画关系图、
 拦住「指向不存在的角色」。`人物卡.txt` 是渲染出来给你和 AI 读的镜像。
@@ -150,6 +166,7 @@ D:\dsh\plugins\dsh-novel-plugin\
 ├── test-save.mjs             写盘路径（新格式 + 老格式兼容 + 改名删除 + 真建真删）
 ├── test-client.mjs           客户端半（迷你 React 递归渲染 + fetch 桩打真路由）
 ├── test-manifest.mjs         清单不变式：两个 inject 不许写混、peer/engines 声明齐
+├── test-setup.mjs            开书向导的宿主半：设定.json 读写 + 一次性落盘 + 别把老项目带偏
 └── probe-client-bundle.mjs   只读探针：算 rev 去问跑着的 DSH 要客户端 bundle
 ```
 
@@ -174,8 +191,8 @@ C:\Users\<你>\.dsh\profiles\<profile>\package.json
 | 工具 | 干什么 |
 |---|---|
 | `novel_list` | 列出所有小说 + 章节 + 角色数 |
-| `novel_read` | 读大纲 / 世界观 / 人物卡 / 某一章正文 |
-| `novel_context` | **一次取全「续写下一章」所需上下文**（大纲 + 世界观 + 角色关系 + 最近 N 章） |
+| `novel_read` | 读设定（`设定.json`）/ 大纲 / 世界观 / 人物卡 / 某一章正文 |
+| `novel_context` | **一次取全「续写下一章」所需上下文**（设定 + 大纲 + 世界观 + 角色关系 + 最近 N 章） |
 | `novel_save_chapter` | 存盘，文件名自动编号 `第NNN章-标题.txt` |
 | `novel_cast` | 读 / 增删改**角色与人物关系**；不传操作参数就是只读 |
 
@@ -200,12 +217,12 @@ C:\Users\<你>\.dsh\profiles\<profile>\package.json
 | 路由 | 说明 |
 |---|---|
 | `GET  /novel/api/list` | 小说 + 章节 + 卷 + 设定文件 + 角色数 |
-| `GET  /novel/api/read?novel=&file=` | 读一章正文 / 一个设定文件（卷里的章用 `卷名/文件名`） |
+| `GET  /novel/api/read?novel=&file=` | 读一章正文 / 一个设定文件（卷里的章用 `卷名/文件名`）；`file=设定` 读设定，**没有这个文件也算正常**（返回默认值 + `exists:false`） |
 | `GET  /novel/api/cast?novel=` | 读角色表（带 warnings / legacyMd / 图片头像地址） |
 | `POST /novel/api/cast` | `{novel, cast}` 整表保存 / `{novel, ops}` 增量改 / **`{novel, rename:{from,to}, dryRun}` 改角色名**（dryRun 只统计；真改会先备份到 `_改名备份\` 再全文替换） |
 | `GET  /novel/api/avatar?novel=&id=` | **图片头像**出图（没图 404，带正确 Content-Type） |
 | `POST /novel/api/avatar` | 上传头像 `{novel, id, dataUrl}` / 去掉 `{action:'remove'}` |
-| `POST /novel/api/save` | 存 `大纲.txt` / `世界观.txt` / `chapters\*.txt` |
+| `POST /novel/api/save` | 存 `大纲.txt` / `世界观.txt` / `chapters\*.txt`；**`file=设定` 存设定**（`{settings:{…}}` 走对象入口，`{text:'{…}'}` 走文本入口，坏 JSON 会被拦住并说清原因） |
 | `GET  /novel/api/stream?session=` | **流式输出**：正在写的字 + 预览类型（chapter/text/reasoning） |
 | `POST /novel/api/chapter` | 章节 `create`（空章节，可带 `volume`）/ `rename` / `delete` / `reorder`（重新编号 + 挪卷） |
 | `POST /novel/api/volume` | 卷 `create` / `rename` / `delete`（删卷 = 整卷进回收站） |
@@ -309,9 +326,10 @@ node test-avatar.mjs      # 图片头像：上传/出图/换格式/删除/坏输
 node test-ebook.mjs       # EPUB / DOCX：自写 readZip 往返比对 + w:t 必须在 w:r 里
 node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 桩打到真路由
 node test-manifest.mjs    # 清单不变式：dsh.client.inject 写包、exports.inject 写服务名，别混
+node test-setup.mjs       # 开书向导宿主半：设定.json 读写 + 一次性落盘 + 老项目不被带偏
 ```
 
-目前 **1281 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
+目前 **1367 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
 
 | 测试 | 在哪跑 | 会留下什么 |
 |---|---|---|
@@ -323,6 +341,7 @@ node test-manifest.mjs    # 清单不变式：dsh.client.inject 写包、exports
 | `test-rename.mjs` | 系统临时目录 | 无 —— **改角色名**（dry-run 统计 / 备份 / 全文替换 / 单字名字不替换） |
 | `test-client.mjs` / `test-config.mjs` | 系统临时目录 / 临时配置文件 | 无（整目录删掉） |
 | `test-manifest.mjs` | **只读仓库自己的文件**（`package.json` + `lib/client.js`） | 无 —— 连临时目录都不用建 |
+| `test-setup.mjs` | **你的真实小说库里**（只建两本 `__自测开书_*` 临时书） | 无（连它建的那两本一起删，跑完还有断言检查删干净了） |
 
 > 早期版本这里踩过一次：`test-save` 把临时作品"删除"进真实回收站，清理却只删了原路径，
 > 连跑几次就在用户回收站里堆了一堆垃圾。现在 `cleanup()` 会清自己的回收站条目，
@@ -336,6 +355,9 @@ node test-manifest.mjs    # 清单不变式：dsh.client.inject 写包、exports
    `lib/index.js` 里**真实的**路由 handler → 「面板 → API → 磁盘文件」整条链路真跑一遍。
 3. **迷你 React 会递归渲染子组件**，槽位 key = 「位置 + 组件类型名」（类型变了就重新挂载，
    跟真 React 一致——不然 hooks 会被张冠李戴，我就被这个坑过）。
+   还有一条同类的：真 `React.createElement` 会把子节点**同时**放进参数和 `props.children`，
+   桩也必须照做 —— 少这一条，组件里写 `props.children` 的代码在测试里会**凭空消失**
+   （生产环境却是好的）。这种"测试比实现更严"的假红最费时间。
 
 只想看看某个插件的客户端 bundle 有没有被服务端认出来：
 
@@ -460,6 +482,18 @@ node probe-client-bundle.mjs dsh-novel D:\dsh\plugins\dsh-novel-plugin\lib\clien
     `loadProfileDirectory` 就 **throw，Web 服务根本没机会监听**（症状又是"网页打不开"，
     和当年那个 BOM 事故一模一样的体感）。所以本插件现在**主动声明**了 peer 范围 +
     `dsh.engines.dsh`：与其"靠兼容性侥幸活着"，不如让宿主在装错版本时**明确拦住**。
+24. **同一个 tick 里连改两个字段，闭包里的旧 state 会把前一个吃掉。** 开书向导里我一开始写
+    `set({ ...d, name: v })`（`d` 是本次 render 的 state）—— 测试里连着设「书名 + 简介」，
+    **书名就没了**：两次 `onChange` 都攥着同一个旧 `d`，后一次把前一次覆盖掉。真人粘贴、
+    连着点模板同样会中招，而且界面上完全看不出来。
+    规矩：**凡是"基于当前 state 算下一个 state"，一律用函数式更新** `set((prev) => ({ ...prev, x: v }))`。
+    （这个 bug 是测试先抓到的 —— 它值得为它写一条断言。）
+25. **往 `LAYOUT` 里加文件之前，先想清楚 `isLegacyProject()` 会怎么判。** `设定.json` 我本来想直接
+    加进 `LAYOUT`（那里是"新名 ↔ 老名"对照表）。但 `isLegacyProject()` 的逻辑是
+    "**只要发现任何一个老名字存在，整本书就按老格式走**"，而 `pickFile()` 会去
+    `path.join(dir, spec.old)` —— `设定.json` 没有老英文名，塞进去的结果是**每一本新书都被判成老项目**，
+    大纲转头去读根本不存在的 `outline.md`。最后它做成了独立的固定文件名，在别名分支前单独拦一道，
+    并且专门写了一条断言盯着："有 设定.json 的书，大纲仍解析到 大纲.txt"。
 
 ---
 
@@ -493,6 +527,9 @@ DOCX 双击用 Word 或 WPS 打开 —— 能翻页、标题有层级、没有 `
 
 - 多设备同步（小说库记忆现在存在浏览器本地，手机上打开是另一套）
 
+> v0.13.0 加了**开书向导**（整页 / 五个折叠区 / 4 套只补空位的模板 / 「✨ 让 AI 帮我补全」）
+> 和机器可读的 **`设定.json`**（类型 / 基调 / 视角 / 每章目标字数 / 主线 / 结局），
+> 设定页能用表单改，`novel_context` 续写时会先把它读给你听。
 > v0.12.0 把面板从**第三方侧栏**迁到了**宿主原生席位**（左侧栏一行 + 主区页面，不再依赖
 > dsh-better-sidebar），并主动声明了 peer 范围 + `dsh.engines.dsh`，让宿主能在版本不匹配时拦住。
 > 更早的 v0.11.0 做完：卷 / 章、关系图自动布局（力导向）、图片头像、EPUB / Word 导出。

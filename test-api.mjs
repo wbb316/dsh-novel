@@ -248,7 +248,13 @@ console.log('\n── 7. scanNovel 边界 ──')
   const s = scanNovel('__不存在的书__')
   ok('不存在的书不抛错', !!s)
   ok('章节数 0', s.chapterCount === 0)
-  ok('settings 为空数组', Array.isArray(s.settings) && s.settings.length === 0)
+  // 设定.json 总是列出来（文件不存在也算正常：读给默认值、一存就落盘），
+  // 所以"什么都没有的书"这里不是空数组，而是只剩这一项
+  ok(
+    '不存在的书：settings 里只剩「设定」这一个总是可编辑的项',
+    Array.isArray(s.settings) && s.settings.length === 1 && s.settings[0].kind === 'settings',
+    (s.settings || []).map((x) => x.file).join(',')
+  )
   ok('角色统计兜底为 0', s.cast.characters === 0 && s.cast.relations === 0)
 }
 

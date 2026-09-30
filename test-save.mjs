@@ -120,12 +120,12 @@ try {
     const s = scanNovel(TEMP)
     ok(
       'scanNovel 报的是中文名',
-      s.settings.map((x) => x.file).join(',') === '大纲.txt,世界观.txt,人物卡.txt',
+      s.settings.map((x) => x.file).join(',') === '大纲.txt,世界观.txt,人物卡.txt,设定.json',
       s.settings.map((x) => x.file).join(',')
     )
     ok(
       '设定带中文标签',
-      s.settings.map((x) => x.label).join(',') === '大纲,世界观,人物卡（生成）',
+      s.settings.map((x) => x.label).join(',') === '大纲,世界观,人物卡（生成）,设定',
       s.settings.map((x) => x.label).join(',')
     )
     ok('人物卡标了 generated', s.settings.find((x) => x.kind === 'castText')?.generated === true)
@@ -400,8 +400,8 @@ try {
     const s = scanNovel(LEGACY)
     ok('章节读到了（.md）', s.chapters.map((c) => c.file).join(',') === '第001章-老章.md', s.chapters.map((c) => c.file).join(','))
     ok('章号解析正确', s.chapters[0].no === 1 && s.chapters[0].title === '老章', `${s.chapters[0].no}/${s.chapters[0].title}`)
-    ok('设定报的是老文件名', s.settings.map((x) => x.file).join(',') === 'outline.md,world.md', s.settings.map((x) => x.file).join(','))
-    ok('但标签还是中文的', s.settings.map((x) => x.label).join(',') === '大纲,世界观', s.settings.map((x) => x.label).join(','))
+    ok('设定报的是老文件名', s.settings.map((x) => x.file).join(',') === 'outline.md,world.md,设定.json', s.settings.map((x) => x.file).join(','))
+    ok('但标签还是中文的', s.settings.map((x) => x.label).join(',') === '大纲,世界观,设定', s.settings.map((x) => x.label).join(','))
 
     const read = await call('GET', '/novel/api/read', {
       url: '/novel/api/read?novel=' + encodeURIComponent(LEGACY) + '&file=' + encodeURIComponent('大纲')
@@ -660,7 +660,7 @@ try {
     ok('迁移后 legacy 变 false', after.legacy === false, String(after.legacy))
     ok(
       '设定报的是新名字',
-      after.settings.map((x) => x.file).join(',') === '大纲.txt,世界观.txt,人物卡.txt',
+      after.settings.map((x) => x.file).join(',') === '大纲.txt,世界观.txt,人物卡.txt,设定.json',
       after.settings.map((x) => x.file).join(',')
     )
     ok('章节数没变', after.chapterCount === 2, String(after.chapterCount))
