@@ -4,7 +4,7 @@
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![DSH](https://img.shields.io/badge/DSH-0.2.0--rc.1%2B-4d6bfe.svg)](https://github.com/deepseek-ai)
 [![seats](https://img.shields.io/badge/panel-native%20seats-7e57c2.svg)](#-原生席位小说面板)
-[![tests](https://img.shields.io/badge/tests-1263%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
+[![tests](https://img.shields.io/badge/tests-1281%20assertions-success.svg)](#-开发和自测不启动-dsh不占端口)
 [![release](https://img.shields.io/github/v/release/wbb316/dsh-novel?label=release&color=success)](https://github.com/wbb316/dsh-novel/releases)
 
 DSH 插件：**小说创作台**。管你的小说项目（大纲 / 世界观 / 角色 & 关系 / 章节），
@@ -149,6 +149,7 @@ D:\dsh\plugins\dsh-novel-plugin\
 ├── test-cordis.mjs           真 cordis 生命周期（动态注入 webServer 那条路径）
 ├── test-save.mjs             写盘路径（新格式 + 老格式兼容 + 改名删除 + 真建真删）
 ├── test-client.mjs           客户端半（迷你 React 递归渲染 + fetch 桩打真路由）
+├── test-manifest.mjs         清单不变式：两个 inject 不许写混、peer/engines 声明齐
 └── probe-client-bundle.mjs   只读探针：算 rev 去问跑着的 DSH 要客户端 bundle
 ```
 
@@ -307,9 +308,10 @@ node test-volume.mjs      # 卷 / 章：跨卷挪动、卷名排序（第一卷<
 node test-avatar.mjs      # 图片头像：上传/出图/换格式/删除/坏输入/脏数据
 node test-ebook.mjs       # EPUB / DOCX：自写 readZip 往返比对 + w:t 必须在 w:r 里
 node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 桩打到真路由
+node test-manifest.mjs    # 清单不变式：dsh.client.inject 写包、exports.inject 写服务名，别混
 ```
 
-目前 **1263 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
+目前 **1281 项断言全绿**。**你的小说文件永远不会被改**，但要说清楚各自在哪跑：
 
 | 测试 | 在哪跑 | 会留下什么 |
 |---|---|---|
@@ -320,6 +322,7 @@ node test-client.mjs      # 迷你 React 挂载面板（含子组件），fetch 
 | `test-plot.mjs` | 系统临时目录 | 无 —— **剧情表**（情节点、挂章节、手勾 vs 自动、卷纲领） |
 | `test-rename.mjs` | 系统临时目录 | 无 —— **改角色名**（dry-run 统计 / 备份 / 全文替换 / 单字名字不替换） |
 | `test-client.mjs` / `test-config.mjs` | 系统临时目录 / 临时配置文件 | 无（整目录删掉） |
+| `test-manifest.mjs` | **只读仓库自己的文件**（`package.json` + `lib/client.js`） | 无 —— 连临时目录都不用建 |
 
 > 早期版本这里踩过一次：`test-save` 把临时作品"删除"进真实回收站，清理却只删了原路径，
 > 连跑几次就在用户回收站里堆了一堆垃圾。现在 `cleanup()` 会清自己的回收站条目，
