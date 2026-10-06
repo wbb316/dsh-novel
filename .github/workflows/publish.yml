@@ -13,6 +13,11 @@ name: Publish to npm
 # 首次使用需要在本仓库 Settings → Secrets and variables → Actions 里加一个名为
 # NPM_TOKEN 的 secret（npm 的 Granular Access Token，权限只需该包的 read+write）。
 # 没配也不会失败：guard 会跳过发布并打一条 notice，仓库保持绿。
+#
+# ⚠️ 但配了也可能发不出去：npm 上的 `dsh-novel` 属于别人（维护者 harrisding、
+# 仓库 ddedook/dsh-novel），而本仓库的 package.json 也写着 name = dsh-novel。
+# 所以在本仓库改名之前推 tag，会以「校验包名归属」这一步失败 —— 这不是 bug，
+# 是那道检查在替你挡下一次注定 403 的发布。见 docs/RELEASING.md 的「先说清楚」与「怎么改名」。
 on:
   push:
     tags:
@@ -65,6 +70,52 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # 防呆零：**这个名字是不是你的**。
+      #
+      # 起因：npm 上的 `dsh-novel` 属于别人（维护者 harrisding、仓库 ddedook/dsh-novel），
+      # 而本仓库的 package.json 也写着 name = dsh-novel。不改名就推 tag，会在最后一步
+      # 撞 npm 的 403，而那个报错完全不提「名字被占了」。这一道把它提前成一句人能读懂的话。
+      # 顺带覆盖另一种错法：NPM_TOKEN 失效时 npm whoami 为空，也不该继续往下走。
+      - name: 校验包名归属
+        id: owner
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          name="$(node -p "require('./package.json').name")"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          me="$(npm whoami 2>/dev/null || true)"
+          if [ -z "$me" ]; then
+            echo "::error::读不到 npm 身份（npm whoami 为空）——NPM_TOKEN 无效或权限不足，无法确认 $name 的归属，拒绝发布。"
+            exit 1
+          fi
+          echo "token 身份：$me"
+          # 先单独探「存不存在」，不要直接读 maintainers：
+          # 名字不存在时 npm view --json 会把一个 E404 **错误对象**打到 stdout（实测过），
+          # 拿它当维护者列表会误判 —— 而且那个错误文本里恰好含包名，grep 包名会假通过。
+          if ! npm view "$name" version >/dev/null 2>&1; then
+            echo "::notice::npm 上还没有 $name，按新包发布（scoped 名会在发布时自动创建 scope）。"
+            exit 0
+          fi
+          owners="$(npm view "$name" maintainers --json 2>/dev/null || echo '[]')"
+          # 精确比对，不做子串匹配：维护者条目是 `名字 <邮箱>` 形态，
+          # 子串匹配会让 `wbb` 命中 `wbb316` 这种假通过。
+          verdict="$(node -e '
+            const [me, raw] = process.argv.slice(1)
+            let list = []
+            try { list = JSON.parse(raw) } catch {}
+            if (!Array.isArray(list)) list = []
+            const names = list.map((s) => String(s).replace(/<.*$/, "").trim())
+            process.stdout.write(names.includes(me) ? "yes" : "no")
+          ' "$me" "$owners")"
+          if [ "$verdict" = "yes" ]; then
+            echo "::notice::$name 已存在，且 $me 在维护者名单里，允许发布。"
+            exit 0
+          fi
+          echo "::error::npm 上的 $name 不属于当前身份（$me）——它的维护者是：$owners"
+          echo "::error::别发。改名成你拥有的 scope，例如 @wbb316/dsh-novel（npm view @wbb316/dsh-novel version 报 404 即为空着）。改名要同时改 package.json 的 name、每个 profile 的 dependencies 键与 dsh.profile.bundles 数组——见 docs/RELEASING.md 的「怎么改名」。"
+          exit 1
+
       # 防呆一：tag 是 v0.14.0 而 package.json 还写着 0.13.0 时，发出去的就是错的版本。
       # 只在 ref 真的是个 v* tag 时才校验（手动从分支触发时 ref 是分支名，无从比较）。
       - name: 校验版本号与 tag 一致
@@ -87,7 +138,7 @@ jobs:
         id: exists
         if: steps.guard.outputs.skip == 'false'
         run: |
-          if npm view "dsh-novel@${{ steps.ver.outputs.version }}" version >/dev/null 2>&1; then
+          if npm view "${{ steps.owner.outputs.name }}@${{ steps.ver.outputs.version }}" version >/dev/null 2>&1; then
             echo "already=true" >> "$GITHUB_OUTPUT"
             echo "::notice::npm 上已存在 ${{ steps.ver.outputs.version }}，跳过发布（同版本号不可覆盖）。"
           else
@@ -114,6 +165,7 @@ jobs:
             echo ""
             echo "| 项 | 值 |"
             echo "| --- | --- |"
+            echo "| 包名 | ${{ steps.owner.outputs.name }} |"
             echo "| 版本 | ${{ steps.ver.outputs.version }} |"
             echo "| 跳过（没配 token） | ${{ steps.guard.outputs.skip }} |"
             echo "| 跳过（版本已存在） | ${{ steps.exists.outputs.already }} |"
