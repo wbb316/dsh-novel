@@ -1,0 +1,121 @@
+name: Publish to npm
+
+# 触发点有三条，缺一不可（见 docs/RELEASING.md 的「为什么会不自动发」）：
+#
+#   push tag   —— 主路径。**必须**直接监听 tag，不能只依赖 release 事件：
+#                 release.yml 用仓库自带的 GITHUB_TOKEN 建 Release，
+#                 而 GITHUB_TOKEN 产生的 release 事件**不会**再触发别的 workflow
+#                 （GitHub 防止递归触发的规定），只挂 release 事件会导致「Release 建了、
+#                 npm 没发」。
+#   release    —— 给人用：在 GitHub 界面上手动发布 Release 时会走这条。
+#   workflow_dispatch —— 补发/重试；可指定 tag，留空则用 package.json 的版本号。
+#
+# 首次使用需要在本仓库 Settings → Secrets and variables → Actions 里加一个名为
+# NPM_TOKEN 的 secret（npm 的 Granular Access Token，权限只需该包的 read+write）。
+# 没配也不会失败：guard 会跳过发布并打一条 notice，仓库保持绿。
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的 tag（例如 v0.13.0）；留空则按 package.json 的版本号发'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  # 发布用 OIDC 带 provenance 签名，需要这个权限
+  id-token: write
+
+# 同一时刻只允许一个发布在跑；不取消进行中的那个（发到一半被砍最糟）
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: npm publish
+    runs-on: ubuntu-latest
+    steps:
+      # 手动指定了 tag 就检那个 tag，否则检触发这次运行的那个 ref
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          # 显式指向官方源：本机/镜像的 registry 配置不该影响发布目标
+          registry-url: 'https://registry.npmjs.org'
+
+      # secrets 在 step 级 if 里不可用，所以先落到 env 再判断
+      - name: 检查 NPM_TOKEN 是否已配置
+        id: guard
+        env:
+          TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::没有配置 NPM_TOKEN secret，跳过 npm 发布（见 docs/RELEASING.md）。"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 防呆一：tag 是 v0.14.0 而 package.json 还写着 0.13.0 时，发出去的就是错的版本。
+      # 只在 ref 真的是个 v* tag 时才校验（手动从分支触发时 ref 是分支名，无从比较）。
+      - name: 校验版本号与 tag 一致
+        if: steps.guard.outputs.skip == 'false'
+        run: |
+          ver="$(node -p "require('./package.json').version")"
+          ref="${{ github.event.inputs.tag }}"
+          [ -n "$ref" ] || ref="${GITHUB_REF_NAME}"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          if [ "${ref#v}" != "$ref" ] && [ "${ref#v}" != "$ver" ]; then
+            echo "::error::tag 是 $ref，但 package.json 的 version 是 $ver，拒绝发布。"
+            exit 1
+          fi
+          echo "版本号：$ver（ref：$ref）"
+        id: ver
+
+      # 防呆二：npm 的版本号不可覆盖重发。重复触发（比如 UI 上又发了一次 Release）
+      # 不该变成一次红色构建，检测到已存在就跳过。
+      - name: 该版本是否已发布过
+        id: exists
+        if: steps.guard.outputs.skip == 'false'
+        run: |
+          if npm view "dsh-novel@${{ steps.ver.outputs.version }}" version >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::npm 上已存在 ${{ steps.ver.outputs.version }}，跳过发布（同版本号不可覆盖）。"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 发出去的包先自证。run-tests.mjs 会 cd 到包根目录再逐个跑 test-*.mjs
+      # （这些测试用的是包根相对路径，cwd 不对会假失败）。
+      - name: 跑测试
+        if: steps.guard.outputs.skip == 'false' && steps.exists.outputs.already == 'false'
+        run: npm test
+
+      - name: 发布到 npm
+        if: steps.guard.outputs.skip == 'false' && steps.exists.outputs.already == 'false'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
+
+      - name: 结果摘要
+        if: always()
+        run: |
+          {
+            echo "### npm 发布"
+            echo ""
+            echo "| 项 | 值 |"
+            echo "| --- | --- |"
+            echo "| 版本 | ${{ steps.ver.outputs.version }} |"
+            echo "| 跳过（没配 token） | ${{ steps.guard.outputs.skip }} |"
+            echo "| 跳过（版本已存在） | ${{ steps.exists.outputs.already }} |"
+            echo "| 结论 | ${{ job.status }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -9,6 +9,9 @@
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
+  "scripts": {
+    "test": "node run-tests.mjs"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/wbb316/dsh-novel.git"
