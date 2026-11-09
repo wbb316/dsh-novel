@@ -372,8 +372,8 @@ try {
   ok('模块 id = dsh-novel', loaded && loaded.id === 'dsh-novel', String(loaded && loaded.id))
   const m = loaded.factory(fakeRequire)
   ok(
-    'inject = 客户端服务名（slots，由 ui-renderer 提供）',
-    JSON.stringify(m.inject) === '["slots"]',
+    'inject = 客户端服务名（slots 由 ui-renderer 提供；sessions 用来取会话作用域 ctx）',
+    JSON.stringify(m.inject) === '["slots","sessions"]',
     JSON.stringify(m.inject)
   )
   ok('apply 是函数', typeof m.apply === 'function')

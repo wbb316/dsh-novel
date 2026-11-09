@@ -261,18 +261,25 @@ ctx.slots.inject("main", () => ctx.slots.register(
 - 面板页用 `NovelPanelPage` 包一层 `.dn_page`（撑满主区）再渲染 `NovelPanel` 本体。
 - **两边 inject 写的不是同一种东西**：`package.json` → `dsh.client.inject` 写**包 id**
   （`@deepseek-ai/dsh-client-ui-renderer` / `-layout` / `-conversation`）；
-  客户端半里 `exports.inject` 写**服务名**（`["slots"]`）。详见踩坑第 4 条。
+  客户端半里 `exports.inject` 写**服务名**（`["slots", "sessions"]`）。详见踩坑第 4 条。
+  `sessions` 是"按会话要作用域 ctx"用的（`ctx.get('sessions').scope(id)`），
+  Cordis 里**不声明就 `cannot get property "sessions"`**。
 
 功能（无论走哪条路都一样）：
 - **✍️ 写下一章**：点一下就把续写请求**直接发进当前会话**（不用回去打字）：
   - 输入框是空的 → 替你填好并发送（`setDraft` + `submit('queue')`，agent 正忙就排队、不打断）
   - 输入框里已经有你打的字 → **只追加、绝不覆盖**，并提醒你按 Enter
-  - 拿不到 conversation 服务 → 明确提示"直接在聊天里说"（全程 try/catch，不炸面板）
+  - 「当前会话」怎么认：主区正在显示的那个（会话快照里 `retainedBy.mainView`），
+    没有就退回最近更新的普通会话（跳过子代理）
+  - 真的一个会话都没有 / 宿主没有 `conversation` 服务 → 明确提示"直接在聊天里说"（全程 try/catch，不炸面板）
 - **✍️ 直播间**：模型正在写的字**流式显示**在面板里（0.4 秒追一次）
   - 章节正文是当工具参数流出来的 → 从半截 JSON 里把 `content` 抠出来显示（这才是用户想看的）
   - 正文还没开始就先显示"🤔 正在想…"（reasoning），后两类自动降级
   - **写完后自动刷新章节列表** —— 新章不用手点就冒出来
 - **章节**页：列出章节、点开看正文、默认跟着最新一章走（手动点旧章就停下不再跟随）
+  - **列表 / 正文之间的分隔条可以拖**：往上拖列表变小、往下拖变大；高度记在
+    `localStorage`（键 `dsh-novel:listH`），**双击分隔条**复位到默认（容器的 40%）。
+    键盘也行：Tab 到分隔条上 `↑/↓` 各 24px，`Home` 复位。
   - **✏️ 改名**：保留「第NNN章」编号，只换标题
   - **🗑️ 删除**：删前确认
 - **📚 小说库（换小说不用重新找）**：面板记住「你正在写哪本」+「每本读到哪一章」
@@ -409,6 +416,19 @@ node probe-client-bundle.mjs dsh-novel D:\dsh\plugins\dsh-novel-plugin\lib\clien
 10. **要"蹭"别的插件的服务**（比如把消息发进对话输入框），就
     `ctx.get('服务名')` + 每一步判空 + 全程 try/catch，**拿不到就明确降级提示**，
     绝不让自己的面板崩掉。参照实现：`dsh-better-sidebar/src/client/conversation-draft.ts`。
+
+    ⚠️ **2026-11-09 补充（朋友在桌面版 0.2.2-rc.1 上点「写下一章」，面板弹红字）**：
+    「拿不到 conversation 服务」这句话当时**是错的** —— 服务一直在，缺的是**会话作用域**。
+    三条，缺一条就报那个错：
+    - `conversation.input.for(actx)` 要**会话作用域**的 ctx；面板在 `main` 席位（root 作用域），
+      宿主只递 hook、不递 `sessionId`，把自己的 ctx 递进去 `for()` 只会拿到 null/抛错。
+    - 会话作用域由 `ctx.get('sessions').scope(id)` 给。`sessions` **必须写进客户端半的
+      `exports.inject`**（Cordis：不声明就是 `cannot get property "sessions" without inject`）。
+    - 这两个服务**都晚于 `apply` 注册**（apply 阶段 `ctx.get` 一律 undefined），
+      所以**只能在点击时惰性取**，别想着在 apply 里存一份。
+    另外 `main` 席位拿不到 `sessionId` 是设计如此（keyed 席位按左侧栏 id 派发，"你不一定对应会话"）：
+    要靠 `props.useSessions(selector)` 从会话快照里挑 —— 优先 `retainedBy.mainView`，
+    再退回最近更新的普通会话（跳过 `origin: "subagent"`）。`test-composer.mjs` 钉住了这几条。
 11. **想看"正在写的字"，DSH 0.1.5 已经没有 `assistant/chunk` 事件了** ——
     要订阅内存帧 `ctx.on('agent/assistant-stream')`，自己把 start/chunk/end 折起来
     （0.1.2 的做法在 0.1.5 上拿不到任何东西）。
@@ -504,6 +524,15 @@ node probe-client-bundle.mjs dsh-novel D:\dsh\plugins\dsh-novel-plugin\lib\clien
     `path.join(dir, spec.old)` —— `设定.json` 没有老英文名，塞进去的结果是**每一本新书都被判成老项目**，
     大纲转头去读根本不存在的 `outline.md`。最后它做成了独立的固定文件名，在别名分支前单独拦一道，
     并且专门写了一条断言盯着："有 设定.json 的书，大纲仍解析到 大纲.txt"。
+26. **flex 列里的「上面列表 / 下面正文」会被正文撑爆 —— 这次是"章节区只剩一行"的真因。**
+    原来写的是 `.dn_rows{flex:0 1 auto;max-height:34%}` + `.dn_read{flex:1 1 auto}`：
+    正文那个 `pre` 有 6000 多像素，`flex-basis:auto` 就按内容高度算，flex 收缩时
+    大头全摊给兄弟节点 —— 列表被压到 **19px**（DOM 实测），连卷标题都盖住了。
+    两条都改：
+    - 正文 `flex:1 1 0`（basis 归零，不再拿内容高度去抢空间）；
+    - 列表给**明确的 px 高度** + 分隔条（`localStorage` 记住），别再指望百分比
+      `max-height` —— 它的百分比要父容器高度是 definite，在 flex 列里经常不成立。
+    教训：**"看起来能用"的 `%` 高度，量一下 DOM 再说**（浏览器快照里 `box.height` 就是答案）。
 
 ---
 
